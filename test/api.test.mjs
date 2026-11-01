@@ -53,7 +53,7 @@ const KNOWN_WORKSPACES = [
 ];
 
 const store = createMemoryStore({ dir: path.join(tmp, 'storage') });
-let settingsValue = { enabled: true, briefing: true, briefMode: 'index', briefingLimit: 12, briefingMaxChars: 2000, autoCapture: true, briefingBudget: 12 };
+let settingsValue = { enabled: true, briefing: true, briefMode: 'index', briefingLimit: 12, briefingMaxChars: 2000, autoCapture: true, briefingBudget: 12, hudIcon: 'a' };
 const settings = {
   get: () => ({ ...settingsValue }),
   set(patch) {
@@ -1115,6 +1115,12 @@ await test('GET /session-brief：只返回本会话的诉求与已沉淀记忆�
   assert.equal(res.body.records.length, 1, '只应返回本会话已生效的记忆');
   assert.equal(res.body.records[0].title, '本会话已沉淀');
   assert.ok(res.body.updatedAt, '应给出最新时间');
+  assert.equal(res.body.icon, 'a', '默认图标为官方鲸鱼标');
+
+  await call('POST', '/settings', { body: { settings: { hudIcon: 'f' } } });
+  const withIcon = await call('GET', '/session-brief', { query: { session: 's-brief-1' } });
+  assert.equal(withIcon.body.icon, 'f', '设置里的图标应随会话摘要返回');
+  await call('POST', '/settings', { body: { settings: { hudIcon: 'a' } } });
 
   const unknown = await call('GET', '/session-brief', { query: { session: 's-none' } });
   assert.equal(unknown.body.entries.length, 0);

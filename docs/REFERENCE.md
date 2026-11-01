@@ -11,7 +11,7 @@
 
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-595%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-597%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 DSH 的**工作区长期记忆**插件。对标 Qoder / WorkBuddy / ZCode 的记忆交互：记忆以当前工作区为单位落库，
 会话开始时把最重要的几条以**索引**形式注入系统提示（一行一条，正文按需用 `memory` 工具取，省 token），
@@ -53,7 +53,7 @@ pwsh -File install.ps1 -FromUrl https://github.com/BangBang-03/dsh-memory-portra
 市场元数据在 `package.json` 的 `dsh.marketplace` / `dsh.permissions`：声明 web / desktop、安装后需重启、桌面端有手动步骤；权限为本地读写、无外发网络、仅调用本地 `git` 做工作区身份识别。兼容口径用 `node tools/check-compat.mjs [--npm]` 核对 README、`package.json` 与 npmjs 已发布清单。headless / TUI 尚未做端到端验证，暂不声明。
 
 - 宿主半 `lib/index.js`：系统提示注入（索引/全文双模式）、轮末相关召回、`memory` 工具、`/memory/api` 路由、轮次结束自动提炼、打开 DSH 后的启动整理、自动刷新全局画像（WorkBuddy 式主路径）。
-- 客户端半 `lib/client.js`：设置面板里的「记忆」页，三个 tab——**记忆库**（首页只留常驻红线、默认展开的记忆画像与「需要处理」；原料、搜索、整理、导入、迁移、日志收进默认收起的「原料与依据」抽屉；库为空时换成「怎么开始」的引导卡）、**维护**（按系统状态 / 需要我处理 / 自动提炼 / 历史记录排，后者默认收起）、设置（注入 / 记录 / 治理 / 高级与数据四组，保存条吸底）。另有前台会话记忆卡：挂在宿主 `shell.overlay` 上的右下角悬浮卡，按当前对话展示「本会话诉求 + 本会话已沉淀记忆」，可收起 / 拖拽，位置与展开状态存本地，内容变化时刷新「更新于 HH:MM」，草稿与归档不可见；设置页的「该对话记忆」可按对话关闭。
+- 客户端半 `lib/client.js`：设置面板里的「记忆」页，三个 tab——**记忆库**（首页只留常驻红线、默认展开的记忆画像与「需要处理」；原料、搜索、整理、导入、迁移、日志收进默认收起的「原料与依据」抽屉；库为空时换成「怎么开始」的引导卡）、**维护**（按系统状态 / 需要我处理 / 自动提炼 / 历史记录排，后者默认收起）、设置（注入 / 记录 / 治理 / 高级与数据四组，保存条吸底）。另有前台会话记忆卡：挂在宿主 `shell.overlay` 上的右下角悬浮卡，采用图标 + 「更新于 YYYY-MM-DD HH:MM」+ 一段话摘要（把本会话沉淀的记忆标题连成一句，草稿与归档不可见）；图标由 `hudIcon` 选择（`a` 官方鲸鱼标默认，`b` 官方 App 图标，`c`–`g` 为二创位图）；可收起 / 拖拽，位置与展开状态存本地；设置页的「该对话记忆」可按对话关闭。卡片只属于当前可见对话：宿主设置弹窗打开、切到插件 / 自动化任务主面板或没有 `[data-conversation-session]` 时整卡隐藏，切换会话时重新拉新会话摘要；弹窗开合与会话 attr 变化走 `MutationObserver`，另有 1 秒兜底轮询。
 - 纯逻辑层：`lib/store.js`（存储）、`lib/dream.js`（整理管线）、`lib/distill.js`（提炼）、`lib/api.js`（HTTP 契约），都不依赖 DSH，可独立测试。
 
 ## 新增：对齐市场同类后补的十六处
@@ -303,7 +303,7 @@ pwsh -File uninstall.ps1 -PurgeStorage   # 连 ~/.dsh/storages/dsh-memory 一起
 ```powershell
 git checkout lab                       # 默认分支；平时只在这里动
 # …改代码…
-node test/run-all.mjs                  # 本机跑一遍：14 个套件 595 条断言
+node test/run-all.mjs                  # 本机跑一遍：14 个套件 597 条断言
 git add <改动的文件>; git commit -m "feat: …"   # 不要用 git add -A（.probe/ 是本地材料）
 
 $out = node tools/push.mjs --branch lab; $out   # 输出 base = 上一版在本地的对应提交
@@ -556,7 +556,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | POST | `/capture` | 立刻提炼一次（`captureMode` 决定落库还是进队列） |
 | POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用 + 画像重写进待审 |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
-| GET | `/session-brief` | 前台会话卡：本会话的用户诉求 + 本会话沉淀的记忆（草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
+| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + 当前 `hudIcon` 图标键（卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
 | GET | `/injections` | 注入审计：最近真正进 prompt 的内容（正文预览 + sha256 前 16 位 + id 列表 + 被挤掉的条目；`full=1` 给原文，`kind` 可过滤） |
 | GET | `/derivations` | 跨层派生链：每层派生了什么、源现在还成不成立（`state` 为 `fresh` / `dirty`，带失效原因） |
 | GET | `/reviews` | 复审队列：带失效条件、到期该复查的记忆（`due` / `soon`） |
@@ -667,9 +667,9 @@ cd <克隆下来的 dsh-memory 目录>
 npm test          # 或 node test/run-all.mjs
 ```
 
-14 个套件、595 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
+14 个套件、597 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
 
-- `store` 150 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
+- `store` 155 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
   工作区不存在时不造目录）、导入导出、并发写；v0.3.0：版本链 supersede/rollback、user 类别强制全局与跨库迁移、
   草稿四不可见、重复簇聚类与合并、体检（重复/过期/断链/草稿）、索引简报预算、镜像版本链线索、keywords 加权、unlink；
   v0.5.0：日志层 journal（按天 `journal/YYYY-MM-DD.md`、只追加，是画像重写的上游原料）、画像的读写与草稿；
@@ -697,15 +697,15 @@ npm test          # 或 node test/run-all.mjs
   再切一层、Qoder 索引页剔除、本机扫描只读；v0.6：来源扩到 Claude Code / Codex / Windsurf
   （递归扫 `~/.claude/projects/*/memory`、`~/.codex/memories`、`~/.codeium/windsurf/memories`，
   Claude 的索引页剔除）。
-- `distill` 41 项 —— 摘录裁剪、模型输出解析容错、触发条件、显式提示词识别；v0.3.0：
+- `distill` 42 项 —— 摘录裁剪、模型输出解析容错、触发条件、显式提示词识别；v0.3.0：
   keywords/supersedes 解析、user 类别强制 global、提示词 v2 指引、existingRecords 带 id。
-- `api` 84 项 —— 51 个端点（49 条路径）、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
+- `api` 85 项 —— 51 个端点（49 条路径）、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
   /health 与 /health/resolve、/timeline、草稿队列（批准带编辑 / 拒绝 / 带 supersedes 的批准兑现版本链）、
   /save 带 supersedes 与 /supersede/rollback；v0.6：`GET /portrait/diff`（上一版 → 当前版的逐段 diff）；
   0.6.4：`GET /record` 依据下钻、`/redline/check` 冲突检查、`/redline/update` 改稿审计、
   `/redline/history` 与 `/redline/rollback`、Dream 时序矛盾归档与 `/health/resolve time-order`。
-- `host` 12 项 —— 导出形状、Config 默认值与越界校验。
-- `activate` 50 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
+- `host` 18 项 —— 导出形状、Config 默认值与越界校验。
+- `activate` 55 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
   工具 save/search/get/forget、全文简报装不下时明说「只列了 N / M 条」、`/memory/api/*` 路由真的应答
   且守好 403/404、手动提炼端到端、面板保存落到工作区镜像、既有记忆扫描导入、数据目录不可用不炸外壳；
   v0.3.0：索引简报（带 id 不展开正文 + full 模式对照）、轮末召回（召回块出现、连续两轮不重复）、
@@ -715,7 +715,7 @@ npm test          # 或 node test/run-all.mjs
   画像重写容错：严格提示重试一次、两次都失败时的可读明细与脱敏日志、有损结果改送待审。
 - `briefing-stability` 15 项 —— 会话级冻结快照、确定性排序、轮末召回的尾部注入与去重；
   改检索算法时用它守住「系统提示字节稳定」。
-- `client` 62 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
+- `client` 68 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
   接到真实 `store` + `api` 上驱动交互（列表 / 搜索 / 新建 / 删除 / 置顶 / 中英文切换 / 后端报错）；
   档案视图的分区与两种排布、整篇编辑、整理、开关即时落库、时间线与维护 tab；
   0.6.4：三页签与首页四块（红线 / 画像 / 需要处理 / 原料抽屉）、红线专用编辑器（预览 / 冲突二次确认 /

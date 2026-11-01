@@ -62,6 +62,7 @@ check('Config 解析空对象得到默认值', () => {
   assert.equal(value.autoDreamPortrait, false, '启动整理默认不重写画像（画像由自动刷新负责）');
   assert.equal(value.autoPortraitHours, 6, '画像默认每 6 小时自动刷新');
   assert.equal(value.sectionOrder, 550);
+  assert.equal(value.hudIcon, 'a', '会话卡图标默认官方鲸鱼标');
   assert.equal(value.directory, '');
   assert.equal(value.autoInject, true, '注入总闸默认开');
   assert.deepEqual(value.disabledWorkspaces, [], '停用名单默认空');
