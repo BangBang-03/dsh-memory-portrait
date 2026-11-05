@@ -276,6 +276,7 @@ await test('apply() 不抛错，工具 / 提示段 / 路由 / 事件都注册到
       'promote',
       'derivations',
       'review',
+      'distill-global',
       'list',
       'get',
       'update',
@@ -2030,6 +2031,74 @@ await test('启动整理：打开 DSH 后自动合并重复簇、写台账并留
     snapshots.some((name) => name.endsWith('-auto-dream')),
     '整理前应留一份 auto-dream 快照',
   );
+});
+
+await test('二级蒸馏：distill-global 动作是模型自己的时机入口，当场产候选并晋升', async () => {
+  const reply = JSON.stringify([
+    {
+      text: '对外素材一律使用构造数据并标注来源',
+      category: 'feedback',
+      topics: ['privacy'],
+      anchors: ['m1', 'm2'],
+    },
+  ]);
+  const { tool, exec, session, calls } = activate({ services: { llm: seqLlm([reply]) } });
+  calls.events.find(([name]) => name === 'session/created')[1](session);
+
+  await tool.execute(
+    { action: 'save', title: '用户拒绝真实截图', content: '不要用真实记忆面板截图，可能泄露用户数据。', category: 'feedback' },
+    exec,
+  );
+  await tool.execute(
+    { action: 'save', title: '失败方案别重复', content: '已判负的路线不要一句话拒绝，换新口径公平复测。', category: 'feedback' },
+    exec,
+  );
+  await tool.execute(
+    { action: 'save', title: '结论要自测', content: '审查结论必须自己重跑代码与数据给数字，不复述文档。', category: 'decision' },
+    exec,
+  );
+
+  const result = await tool.execute({ action: 'distill-global' }, exec);
+  assert.equal(result.count, 1, '应提炼出 1 条候选原则');
+  assert.match(result.text, /提炼出 1 条候选原则/);
+  assert.match(result.text, /本次晋升 1 条全局记忆/, 'feedback 是用户亲口说的，单项目就该晋升');
+});
+
+await test('二级蒸馏：整理不再顺带蒸馏——时机交给模型与轮末，不是定时任务', async () => {
+  const reply = JSON.stringify([
+    {
+      text: '这条原则不该在整理时被自动提炼出来',
+      category: 'feedback',
+      topics: ['privacy'],
+      anchors: ['m1'],
+    },
+  ]);
+  const { tool, exec, session, calls, route } = activate({ services: { llm: seqLlm([reply]) } });
+  calls.events.find(([name]) => name === 'session/created')[1](session);
+  await tool.execute(
+    { action: 'save', title: '素材一', content: '第一条素材，正文足够长以便通过准入检查。', category: 'feedback' },
+    exec,
+  );
+  await tool.execute(
+    { action: 'save', title: '素材二', content: '第二条素材，正文足够长以便通过准入检查。', category: 'feedback' },
+    exec,
+  );
+  await tool.execute(
+    { action: 'save', title: '素材三', content: '第三条素材，正文足够长以便通过准入检查。', category: 'decision' },
+    exec,
+  );
+
+  const dream = await callRoute(route, {
+    method: 'POST',
+    url: '/memory/api/dream',
+    body: JSON.stringify({ workspace }),
+  });
+  assert.equal(dream.status, 200);
+
+  const health = await callRoute(route, {
+    url: `/memory/api/health?workspace=${encodeURIComponent(workspace)}`,
+  });
+  assert.equal(health.body.health.candidates.pending, 0, '整理不该再顺带蒸馏出候选');
 });
 
 fs.rmSync(tmp, { recursive: true, force: true });

@@ -122,6 +122,10 @@ verification / non-blocking）。不要用项目名、技术栈名、产品名�
 
 ## 落库
 
+**什么时候提炼由模型自己判断**，不是定时任务：在工具里调 `memory` 的 `distill-global` 动作
+（那段工作告一段落、或者好几条记忆指向同一条通用原则时），或用本 skill 手工跑一次。
+兜底是轮末——可蒸馏素材比上次多了 5 条会自动提炼一次。
+
 候选原则写入全局候选池，格式 `{ text, category, topics, anchors, project, at }`，
 由 `promotionReport()` 聚类后交给 `PROMOTION_RULES` 判定：
 
