@@ -1468,6 +1468,37 @@ await test('维护页：Dream 按钮调用 /dream 并显示报告', async () => 
   assert.match(body, /Dream 完成/, '应有完成提示');
 });
 
+await test('维护页：全局候选池显示待判定条目，「不再提议」一次点击即生效', async () => {
+  store.candidates.add([
+    {
+      text: '这条候选用于验证面板上的不再提议按钮',
+      category: 'feedback',
+      topics: ['panel-test'],
+      anchors: ['m1'],
+      project: 'ws-panel',
+    },
+  ]);
+  fetchCalls.length = 0;
+  renderPage('zh');
+  await settle(12);
+  await clickTab('tabMaintain');
+  await settle(20);
+
+  const body = text();
+  assert.match(body, /全局候选池/, '维护页应有候选池卡片');
+  assert.match(body, /待判定 [1-9]\d* 条/, '应显示待判定计数');
+  assert.match(body, /这条候选用于验证面板上的不再提议按钮/, '应列出候选正文');
+
+  const btn = mini.findByText(view, makeT('zh')('globalCandidatesReject'), 'button');
+  assert.ok(btn, '缺少「不再提议」按钮');
+  mini.click(btn);
+  await settle(16);
+
+  const called = fetchCalls.find((call) => call.pathname === `${API_PREFIX}/candidates/reject`);
+  assert.ok(called, '应调用 /candidates/reject');
+  assert.equal(called.method, 'POST');
+});
+
 await test('维护页：自动整理卡显示间隔、上次结果与到期日', async () => {
   settingsValue.autoDreamDays = 7;
   settingsValue.autoDreamPortrait = true;

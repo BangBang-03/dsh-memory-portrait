@@ -60,12 +60,37 @@ check('Config 解析空对象得到默认值', () => {
   assert.equal(value.captureSubagents, false, '子代理会话默认不参与自动提炼');
   assert.equal(value.autoDreamDays, 7, '启动整理默认每 7 天一次');
   assert.equal(value.autoDreamPortrait, false, '启动整理默认不重写画像（画像由自动刷新负责）');
+  assert.equal(value.globalDistill, true, '二级蒸馏默认开：自动为主，不靠用户点确认');
   assert.equal(value.autoPortraitHours, 6, '画像默认每 6 小时自动刷新');
   assert.equal(value.sectionOrder, 550);
   assert.equal(value.hudIcon, 'a', '会话卡图标默认官方鲸鱼标');
   assert.equal(value.directory, '');
   assert.equal(value.autoInject, true, '注入总闸默认开');
   assert.deepEqual(value.disabledWorkspaces, [], '停用名单默认空');
+});
+
+/**
+ * C7 的自动化版本：配置键必须同时出现在 README 与 REFERENCE 的配置表里。
+ *
+ * 这条以前只靠人工纪律（「加键记得改三处」），结果真的漏过 6 个键。
+ * 现在改成断言：加键忘了写文档，测试直接红。
+ */
+check('C7 文档覆盖：每个配置键都在 README 与 REFERENCE 的配置表里有说明', () => {
+  const keys = Object.keys(mod.Config({}));
+  const documentedKeys = (file) => {
+    const text = fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    const out = new Set();
+    for (const line of text.split('\n')) {
+      const hit = line.match(/^\| `([a-zA-Z][a-zA-Z0-9]*)` \|/);
+      if (hit) out.add(hit[1]);
+    }
+    return out;
+  };
+  for (const file of ['README.md', 'docs/REFERENCE.md']) {
+    const documented = documentedKeys(file);
+    const missing = keys.filter((key) => !documented.has(key));
+    assert.equal(missing.length, 0, `${file} 配置表缺少：${missing.join(', ')}`);
+  }
 });
 
 check('Config 接受停用工作区名单', () => {

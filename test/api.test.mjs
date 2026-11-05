@@ -351,7 +351,7 @@ await test('GET /mirror 返回路径与 markdown 全文', async () => {
   const res = await call('GET', '/mirror');
   assert.equal(res.status, 200);
   assert.ok(res.body.mirror.dataFile.endsWith('memories.json'));
-  assert.ok(res.body.mirror.markdown.includes('# 工作区长期记忆'));
+  assert.ok(res.body.mirror.markdown.includes('# 项目记忆'));
 });
 
 await test('POST /distill 走注入的提炼函数', async () => {
@@ -1477,6 +1477,55 @@ await test('POST /portrait/migrate：跨 App 画像粘贴整合（rewrite 通道
   assert.equal(bad1.status, 400);
   const bad2 = await call('POST', '/portrait/migrate', { body: { text: '' } });
   assert.equal(bad2.status, 400);
+});
+
+/* ---------------- 二级蒸馏：候选池可见性与「不再提议」 ---------------- */
+
+await test('候选池：/health 带待判定计数与明细，面板据此渲染', async () => {
+  store.candidates.add([
+    {
+      text: '这条原则先存着，等第二个项目出现再判定',
+      category: 'decision',
+      topics: ['noise'],
+      anchors: ['m1', 'm2'],
+      project: 'ws-cand-a',
+    },
+  ]);
+  const res = await call('GET', '/health');
+  assert.equal(res.status, 200);
+  assert.ok(res.body.health.candidates, 'health 应带候选池统计');
+  assert.ok(res.body.health.candidates.pending >= 1);
+  const item = res.body.health.candidateItems.find((x) => x.text.includes('先存着'));
+  assert.ok(item, '待判定明细里应有刚写入的候选');
+  assert.equal(item.category, 'decision');
+  assert.deepEqual(item.topics, ['noise']);
+});
+
+await test('候选池：POST /candidates/reject 一次点击即标记，不需二次确认', async () => {
+  const before = await call('GET', '/health');
+  const target = before.body.health.candidateItems.find((x) => x.text.includes('先存着'));
+
+  const res = await call('POST', '/candidates/reject', {
+    body: { ids: [target.id], reason: 'panel' },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.rejected, 1);
+  assert.equal(res.body.stats.rejected >= 1, true);
+
+  const after = await call('GET', '/health');
+  assert.equal(
+    after.body.health.candidateItems.some((x) => x.id === target.id),
+    false,
+    '标记后不该再出现在待判定明细里',
+  );
+
+  const rejected = store.candidates.list({ status: 'rejected' }).find((x) => x.id === target.id);
+  assert.equal(rejected.rejectReason, 'panel', '要记住拒绝原因，之后同主题不再提议');
+});
+
+await test('候选池：空 ids 返回 400，不静默成功', async () => {
+  const res = await call('POST', '/candidates/reject', { body: { ids: [] } });
+  assert.equal(res.status, 400);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

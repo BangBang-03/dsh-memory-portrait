@@ -11,7 +11,7 @@
 
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-597%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-641%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 DSH 的**工作区长期记忆**插件。对标 Qoder / WorkBuddy / ZCode 的记忆交互：记忆以当前工作区为单位落库，
 会话开始时把最重要的几条以**索引**形式注入系统提示（一行一条，正文按需用 `memory` 工具取，省 token），
@@ -101,13 +101,22 @@ pwsh -File install.ps1 -FromUrl https://github.com/BangBang-03/dsh-memory-portra
   workspaces/<目录名>-<hash>/derivations.json 跨层派生链（画像 / AGENTS.md 的源快照）
   workspaces/<目录名>-<hash>/journal/         每天一个只追加的工作日志
   workspaces/_global/memories.json            跨工作区共享的全局记忆
+  workspaces/_global/candidates.json          二级蒸馏的候选原则池（等跨项目共振）
   backups/<时间戳>-<原因>/                     整库快照（每天一次 + 每次 Dream 前；轮转 7 份）
 ```
 
 工作区键优先取 **git 身份**（`git rev-parse --git-common-dir` 的 realpath，同仓库不同克隆/worktree 共享），不是 git 仓库才回落到**规范化路径的哈希**——同名但不同位置的目录不会互相污染；旧路径键的数据第一次访问会自动搬到新键目录。
-记忆默认**不落在仓库里**，不随 git 外泄；需要人类可读的副本时打开 `mirror`，会在工作区写
-`<工作区>/.dsh-memory/MEMORY.md`（Markdown，可以直接提交也可以 `.gitignore` 掉）。工作区目录
-不存在时这一份会被跳过，绝不凭空造目录；把 `mirror` 关掉会把已生成的那份撤掉（空目录一并收走）。
+记忆默认**不落在仓库里**，不随 git 外泄；需要人类可读的副本或跨机器携带时打开 `mirror`，会在工作区写
+两份文件：`<工作区>/.dsh-memory/MEMORY.md`（Markdown，给人读，可以直接提交也可以 `.gitignore` 掉）
+与同目录的 `memory-snapshot.json`（结构化，保留 id / trust / confidence / supersedes，供另一台机器合并）。
+`MEMORY.md` 按「离线也能读」组织：项目概况与当前关注来自工作区画像，随后是逐字保留的红线、置顶条目、
+按类别分组的约定。**全量渲染，不截断、不按日期拆文件**——WorkBuddy 的 MEMORY.md 能压到 50 行，
+是因为细节散在按日期切分的日志里；这里只有这一份文件承载全部，压缩就等于丢信息。文件头声明的是
+「没装插件时可以直接改」，而不是禁止编辑——离线场景下这个文件可能由别人接手维护，一句「请勿编辑」
+会劝退唯一的维护者。
+两份都**只装本工作区的记录**，全局记忆留在本地，不会被顺带带进某个项目的仓库；快照还会剔除 `useCount`、
+`lastUsedAt` 这类本机统计，否则合并后对方的排序会被本机的使用热度污染。工作区目录不存在时这两份
+都会被跳过，绝不凭空造目录；把 `mirror` 关掉会把已生成的两份一起撤掉（空目录一并收走）。
 
 一条记忆长这样：
 
@@ -303,7 +312,7 @@ pwsh -File uninstall.ps1 -PurgeStorage   # 连 ~/.dsh/storages/dsh-memory 一起
 ```powershell
 git checkout lab                       # 默认分支；平时只在这里动
 # …改代码…
-node test/run-all.mjs                  # 本机跑一遍：14 个套件 597 条断言
+node test/run-all.mjs                  # 本机跑一遍：15 个套件 642 条断言
 git add <改动的文件>; git commit -m "feat: …"   # 不要用 git add -A（.probe/ 是本地材料）
 
 $out = node tools/push.mjs --branch lab; $out   # 输出 base = 上一版在本地的对应提交
@@ -486,9 +495,11 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | `turnRecallLimit` | `3` | 每轮召回条数（1–10） |
 | `turnRecallMaxChars` | `800` | 轮末召回块总字符上限（200–4000），超出的条目不注入 |
 | `sectionOrder` | `550` | 注入段落在系统提示里的位置 |
+| `hudIcon` | `"a"` | 前台会话卡图标：`a` 官方鲸鱼标（默认）/ `b` 官方 App 图标 / `c` 可爱鲸鱼 / `d` 深蓝鲸鱼 / `e`–`g` 鲸鱼娘二创位图。二创图标为公开页面素材、作者未署名，对外分发前需确认授权 |
 | `autoCapture` | `false` | 轮次结束自动提炼 |
 | `autoDreamDays` | `7` | 启动整理：启动时与轮末检查当前（最近使用的）工作区，距上次（自动或手动）整理满 N 天就在后台整理一次；`0` 关闭（0–365）。没有常驻定时器 |
 | `autoDreamPortrait` | `false` | 自动整理（启动时）是否顺带重写画像；默认关——画像由 `autoPortraitHours` 自动刷新负责。手动 Dream 仍会刷新一版进待审 |
+| `globalDistill` | `true` | 二级蒸馏：Dream 时用一次模型调用，把本项目记忆抽成「候选原则」写进全局候选池。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
 | `autoPortraitHours` | `6` | 自动刷新全局画像：每 N 小时检查一次，有新素材时调用模型重写；`0` 关闭（0–168）。面板「立即刷新」只是兜底 |
 | `captureMode` | `"direct"` | `direct` 直接落库；`draft` 先进待审队列 |
 | `staleDays` | `60` | 体检里「过期未用」的判定天数 |
@@ -529,7 +540,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | GET | `/redline/history` | 红线当前版本 + 旧版本列表 |
 | POST | `/redline/rollback` | 红线回滚（必须 `confirm: true`；当前版本先写回历史） |
 | POST | `/settings` | 写设置 |
-| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态） |
+| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态）与 `candidates` / `candidateItems`（二级蒸馏候选池：待判定计数与明细） |
 | POST | `/health/resolve` | 一键处理：`merge`（合并簇，可带 `title/category/tags/content` 覆盖合并稿；红线与矛盾对会被拒绝）/ `time-order`（对一对矛盾按时序归档旧条，红线 / 置顶 / 用户旧条 / 外部新条会被拒绝）/ `archive`（归档过期）/ `unlink`（摘除断链） |
 | GET | `/timeline` | 全部记忆（含归档、不含草稿）按更新时间倒序 |
 | GET | `/portrait` | 当前画像（工作区 + 全局）、版本列表、段落定义 |
@@ -554,7 +565,8 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | POST | `/import-scan` | 按来源 id 或路径导入，用户级来源自动进全局库 |
 | GET | `/mirror` | 取当前工作区镜像的 Markdown |
 | POST | `/capture` | 立刻提炼一次（`captureMode` 决定落库还是进队列） |
-| POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用 + 画像重写进待审 |
+| POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用+ 二级蒸馏与全局原则晋升 + 画像重写进待审 |
+| POST | `/candidates/reject` | 「不再提议」：把候选原则标成 rejected，之后同主题不再晋升。`{ ids, reason? }` |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
 | GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + 当前 `hudIcon` 图标键（卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
 | GET | `/injections` | 注入审计：最近真正进 prompt 的内容（正文预览 + sha256 前 16 位 + id 列表 + 被挤掉的条目；`full=1` 给原文，`kind` 可过滤） |
@@ -667,7 +679,7 @@ cd <克隆下来的 dsh-memory 目录>
 npm test          # 或 node test/run-all.mjs
 ```
 
-14 个套件、597 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
+15 个套件、641 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
 
 - `store` 155 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
   工作区不存在时不造目录）、导入导出、并发写；v0.3.0：版本链 supersede/rollback、user 类别强制全局与跨库迁移、

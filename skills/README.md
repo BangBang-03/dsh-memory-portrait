@@ -6,6 +6,8 @@
 | --- | --- |
 | [`release/SKILL.md`](release/SKILL.md) | 正式发版、打 `v*` 标签、核对 Release |
 | [`docs-sync/SKILL.md`](docs-sync/SKILL.md) | 更新文件 / 更新文档 / 更新日志：README、AGENTS、REFERENCE、CHANGELOG 与 journal 的默认同步 |
+| [`memory-doc/SKILL.md`](memory-doc/SKILL.md) | 更新工作区项目记忆 `.dsh-memory/MEMORY.md`：先判断插件在不在、结构固定、写作规范、离线交接校验 |
+| [`global-distill/SKILL.md`](global-distill/SKILL.md) | 从项目记忆蒸馏跨项目原则（二级蒸馏）：提示词、输出格式、三类禁止、校验与落库 |
 
 新增 skill 的约定：
 

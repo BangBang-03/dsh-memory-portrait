@@ -17,6 +17,7 @@ import path from 'node:path';
 
 // 相对 specifier：Windows 下动态 import() 不接受裸绝对路径。
 const mod = await import('../lib/index.js');
+const { createMemoryStore } = await import('../lib/store.js');
 
 let passed = 0;
 let failed = 0;
@@ -841,6 +842,35 @@ await test('镜像：面板保存的记忆真的落到工作区 .dsh-memory/MEMO
   assert.equal(fs.existsSync(mirrorFile), false, '关掉开关后工作区镜像该消失');
   assert.equal(fs.existsSync(path.join(ws, '.dsh-memory')), false, '空目录也应收掉');
   assert.equal((await callRoute(route, { url: `/memory/api/list${q}` })).body.total, 1);
+});
+
+await test('历史工作区补写：主库有记忆但项目里没有 .dsh-memory 时，打开项目就补上', async () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'backfill-'));
+  const ws = fs.mkdtempSync(path.join(tmp, 'backfill-ws-'));
+
+  // 前提：这条记忆是在镜像关着的状态下写进去的——主库有，工作区什么都没有。
+  const seed = createMemoryStore({ dir, mirror: false });
+  seed.upsert({ title: '历史约定', content: '这条是在镜像关着的时候写进去的。' }, { workspace: ws });
+  assert.equal(fs.existsSync(path.join(ws, '.dsh-memory')), false, '前提：工作区里还没有目录');
+
+  // 以镜像打开的状态激活，并模拟在这个项目里开会话。
+  const { calls, session } = activate({ directory: dir, mirror: true });
+  calls.events.find(([name]) => name === 'session/created')[1]({ ...session, header: { cwd: ws } });
+
+  const md = path.join(ws, '.dsh-memory', 'MEMORY.md');
+  assert.ok(fs.existsSync(md), '打开项目后应补写镜像');
+  assert.match(fs.readFileSync(md, 'utf8'), /历史约定/);
+  assert.ok(
+    fs.existsSync(path.join(ws, '.dsh-memory', 'memory-snapshot.json')),
+    '结构化快照也要一起补，否则换机器仍然合并不了',
+  );
+});
+
+await test('历史工作区补写：主库没有记忆的项目不会被凭空建目录（D2）', async () => {
+  const ws = fs.mkdtempSync(path.join(tmp, 'backfill-empty-'));
+  const { calls, session } = activate({ mirror: true });
+  calls.events.find(([name]) => name === 'session/created')[1]({ ...session, header: { cwd: ws } });
+  assert.equal(fs.existsSync(path.join(ws, '.dsh-memory')), false, '空库不该造目录');
 });
 
 await test('既有记忆导入：扫描本机来源 → 按来源导入 → 真的落库', async () => {

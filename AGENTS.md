@@ -31,18 +31,20 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | **C6** | `status: draft` 四不可见：不进简报、不进检索、不进镜像、不进导出 | 待审队列形同虚设，没被批准的模型产出直接生效 |
 | **C7** | 加端点 / 加配置键 / 改默认值 → 同步三处：`cordis.patch.yml`、README 的「配置」与「HTTP 契约」表、`test/host.test.mjs` 的默认值断言 | README 是发布合同；默认值只改代码不改 patch，用户装上去还是旧值 |
 | **C8** | 红线（`category: constraint`）的治理链不得松动：`store.remove` / `patchRecord` 默认拒绝（`redline_protected`），`overrideRedline` **只能**从面板确认（`POST /delete` 显式传）进来，`memory` 工具的 forget / HTTP 默认路径永不透传；改稿 / 回滚只走面板确认接口（`/redline/update`、`/redline/rollback`，必须 `confirm: true`），旧措辞进历史；红线不参与整理 / 合并；简报里红线先于预算挑选、措辞逐字渲染（不经 LLM 重写软化） | 模型一句话删掉用户的绝对禁令，或禁令被画像重写悄悄改写措辞 |
+| **C9** | 工作区镜像 `MEMORY.md` 是**离线唯一入口**（别的机器上可能没有本插件）：画像段落必须排在条目之前、红线逐字不截断、文件头声明「没装插件时可以直接改」而不是禁止编辑；**全量输出** —— 不按日期拆文件、不截断正文、不丢条目；每次写入整份重写，内容不变时字节必须不变 | 没装插件的机器上，项目记忆要么读不懂、要么读不全 |
 
 ### 1.2 数据与隐私红线
 
 | # | 红线 | 违反了会怎样 |
 | --- | --- | --- |
-| **D1** | 主库只落 `~/.dsh/storages/dsh-memory`，**永不进仓库**；仓库里唯一的记忆文件是 `.dsh-memory/MEMORY.md` 镜像 | 记忆随 git 外泄给所有人 |
-| **D2** | 工作区镜像只在 `mirror: true` **且工作区目录真实存在**时写 `<ws>/.dsh-memory/MEMORY.md`；关开关要能撤回；不许凭空造目录 | 用户删了工作区却被插件重建；关开关后残留 |
+| **D1** | 主库只落 `~/.dsh/storages/dsh-memory`，**永不进仓库**；仓库里只允许 `.dsh-memory/` 下两份副本：`MEMORY.md`（人读）与 `memory-snapshot.json`（结构化，供跨机器合并）。两份都只装本工作区记录，**全局记忆一律不进** | 记忆随 git 外泄给所有人 |
+| **D2** | 工作区镜像与快照只在 `mirror: true` **且工作区目录真实存在**时写 `<ws>/.dsh-memory/{MEMORY.md,memory-snapshot.json}`；关开关要**两份一起**撤回；不许凭空造目录 | 用户删了工作区却被插件重建；关开关后残留孤儿 JSON |
 | **D3** | 每条写入路径（工具、面板、导入、晋升、自动提炼）都必须过 `lib/security.js`：密钥脱敏 + 注入模式 taint | 密钥落盘、taint 内容被当指令执行 |
 | **D4** | `trust` 只能由写入来源推导，模型**不能自封** `user`；非 user 来源命中 taint 一律隔离成草稿 | 提权：模型自己给自己写「用户指令」 |
 | **D5** | `lib/index.js` 的 `route()` 里 `isTrusted()` 必须是第一道门，非回环来源一律 403 | 局域网内任意网页能读写你的全部记忆 |
 | **D6** | 注入措辞必须框成「背景资料」，自动提炼结果必须标来源 | 记忆变指令：三个月前的对话被当成当前任务 |
 | **D7** | 归档 / `supersedes` 而不是删除；推翻要能回滚 | 历史没了，用户改错一次就永久丢数据 |
+| **D8** | `memory-snapshot.json` 只装本工作区 active 记录，**不得**带本机使用统计（`useCount` / `lastUsedAt` / `exposedCount` / `openedCount` / `citedCount`）；内容未变时不重写 | 另一台机器合并后排序被本机热度污染；快照在 git 里永远 dirty |
 
 ### 1.3 流程红线（发布 / 安装）
 
@@ -53,7 +55,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | **P3** | git 与 REST 两条推送通道**不要混用** | REST 重建的提交时区归一成 `+0000`，同树不同 SHA，混推就是分叉 |
 | **P4** | 改 `~/.dsh/profiles/**` 前必须备份（`install.ps1` 自带秒级时间戳备份，手工改也要先备份） | 把用户的 DSH 装坏且无从回滚 |
 | **P5** | 卸载 / 替换只动 junction 与清单项；碰到同名**真实目录**直接报错退出，不许 `Remove-Item -Recurse` | PowerShell 5.1 会跟进 junction 删到共享的 `@deepseek-ai/*`（脚本里已专门防这一步） |
-| **P6** | 改完跑 `node test/run-all.mjs`（14 套件 / 597 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
+| **P6** | 改完跑 `node test/run-all.mjs`（15 套件 / 642 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
 | **P7** | 不加运行时依赖：`dependencies` 保持空，`peerDependencies` 全 optional，`lib/*.js` 只许 import `node:*` 与相对路径 | 插件要在用户机器上零安装；加依赖等于要求所有人重装 |
 | **P8** | 正式版只在 `main` 打 `v*` 标签，且 `package.json` 不许是预发布号（`-lab.N` / `-rc.N` 等）；打标签前 `main` 必须已推送并通过测试；不手改远端保护设置 | 标签挂在旧提交上，`/releases/latest` 发出去的就是旧代码；预发布号漏上去再也升不回来。完整步骤与验收见 `skills/release/SKILL.md` |
 
@@ -66,6 +68,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 你要改什么 | 主文件 | 一起看 | 必须跑 |
 | --- | --- | --- | --- |
 | 记录模型、去重合并、版本链、镜像、导入导出、体检、画像存取 | `lib/store.js` | `lib/quality.js`、`lib/text.js` | `store` |
+| 工作区可携带快照（跨机器携带项目记忆；只装本工作区 active 记录，不含本机统计） | `lib/store.js` 的 `portableSnapshot` / `writeSnapshotFile` | `test/store.test.mjs` 的快照六条用例、`lib/markdown.js` 的 `dsh-memory-mirror` 导入源 | `store` |
 | 红线专用编辑 / 历史 / 冲突检查 | `lib/client.js`（红线编辑器） | `lib/store.js` 的 `updateRedline` / `rollbackRedline` / `redlineConflicts`、`lib/api.js` 的 `/redline/*` | `store` + `api` + `client` |
 | 检索打分（BM25F / 精确短语 / related 一跳 / 同义词扩展） | `lib/retrieval.js` | `test/fixtures/retrieval-hard-60.json`、`docs/retrieval-eval-2026-10-20.md` | `retrieval` |
 | 简报注入、`memory` 工具、轮末召回、路径 JIT、路由挂载、Config schema | `lib/index.js` | `lib/portrait.js`、`lib/api.js` | `activate` + `briefing-stability` + `host` |
@@ -74,7 +77,9 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 前台会话记忆卡（Qoder 式摘要卡：图标 + 更新时间 + 一段话摘要；图标可选 `hudIcon`；可收起/拖拽、位置持久化、按对话开关） | `lib/client.js` 的 `SessionMemoryHud` / `HUD_ICONS` | `lib/api.js` 的 `/session-brief`、`lib/store.js` 的 `sessionSearch`、`lib/index.js` 的 `workspaceForSession` / `activeSession` / `hudIcon` | `client` + `api` |
 | 清单兼容口径 / 市场元数据（`engines.dsh`、`dshReleases`、`marketplace`、`permissions`） | `package.json` | `README.md` 的「兼容性」、`tools/check-compat.mjs`、`.github/workflows/publish*.yml` | `host` + `node tools/check-compat.mjs` |
 | 提炼提示词、模型输出容错、触发条件 | `lib/distill.js` | `lib/index.js` 里的 capture 流程 | `distill` |
-| Dream 整理管线（合并重复簇 / 矛盾报告（不自动归档）/ 启动 + 轮末到期检查与台账） | `lib/dream.js` | `lib/index.js` 的 `runAutoDream`、`lib/store.js` 的 `maintenanceState` / `noteMaintenance`、`lib/api.js` 的 `/dream` 与 `/health` | `api` + `activate` + `store` |
+| 全局原则晋升（候选准入 / 分层门槛 / 主题聚类） | `lib/distill-global.js` | `docs/global-distill-trial-2026-11-05.md`、`test/distill-global.test.mjs` | `distill-global` |
+| 全局候选原则池（候选读写与裁决标记） | `lib/store.js` 的 `candidates` | `lib/distill-global.js`、`skills/global-distill/SKILL.md` | `store` + `distill-global` |
+| Dream 整理管线（合并重复簇 / 矛盾报告（不自动归档）/ 全局原则晋升 / 启动 + 轮末到期检查与台账） | `lib/dream.js` | `lib/index.js` 的 `runAutoDream`、`lib/store.js` 的 `maintenanceState` / `noteMaintenance` / `candidates`、`lib/api.js` 的 `/dream` 与 `/health` | `api` + `activate` + `store` + `distill-global` |
 | 自动刷新全局画像（WorkBuddy 式主路径：turn/end + 会话销毁触发、吸收当前工作区近况） | `lib/index.js` 的 `scheduleAutoPortrait` / `runPortraitRewrite` | `lib/portrait.js`、`lib/client.js` 画像卡自动状态、`lib/api.js` 的 `/portrait` 与 `/health` | `activate` + `portrait` + `api` |
 | 画像段落、渲染 / 解析、预算截断、版本 diff | `lib/portrait.js` | `lib/store.js` 的 portrait 段 | `portrait` |
 | 画像重写提示词、模型输出容错解析、失败重试与有损改送待审 | `lib/portrait.js`（`REWRITE_SYSTEM` / `REWRITE_STRICT_SYSTEM` / `parseRewriteResponse`） | `lib/index.js` 的 `runPortraitRewrite`（重试、脱敏日志、degraded 判定） | `portrait` + `activate` |
@@ -87,6 +92,8 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 安装 / 卸载 / 远程安装 | `install.ps1`、`uninstall.ps1` | `cordis.patch.yml` | `install` |
 | 推送、发版、远端同步 | `skills/release/SKILL.md` | `tools/push.mjs`、`tools/release.mjs`、`tools/release-watch.mjs`、`tools/sync.mjs`、`tools/status.mjs`、`tools/check-compat.mjs` | 见 P6；正式版按 skill 的验收清单 |
 | 文档同步 / 更新日志 | `skills/docs-sync/SKILL.md` | `README.md`、`AGENTS.md`、`CHANGELOG.md`、`docs/README.md` | 按 skill 的检查清单 |
+| 更新项目记忆文件 / 离线交接 | `skills/memory-doc/SKILL.md` | `lib/store.js` 的 `renderMarkdown`（镜像结构由它决定）、同目录 `memory-snapshot.json` | `store` |
+| 从项目提炼全局原则 / 二级蒸馏 | `skills/global-distill/SKILL.md` | `lib/distill-global.js`（判定规则）、`docs/global-distill-trial-2026-11-05.md` | `distill-global` |
 
 ### 2.2 症状 → 先去哪
 
@@ -139,6 +146,8 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | --- | --- |
 | 正式发版、打 `v*` 标签、核对 Release | `skills/release/SKILL.md` |
 | 更新文件 / 更新文档 / 更新日志 | `skills/docs-sync/SKILL.md` |
+| 更新项目记忆 `.dsh-memory/MEMORY.md`：结构、写作规范、离线交接 | `skills/memory-doc/SKILL.md` |
+| 从项目记忆提炼跨项目原则（二级蒸馏） | `skills/global-distill/SKILL.md` |
 | 新增项目级 skill 的目录与 frontmatter 约定 | `skills/README.md` |
 
 ---
@@ -146,7 +155,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 ## 3. 命令速查
 
 ```powershell
-node test/run-all.mjs                  # 14 套件 / 597 断言，改完必跑（P6）
+node test/run-all.mjs                  # 15 套件 / 642 断言，改完必跑（P6）
 node test/store.test.mjs               # 单套件：把 store 换成 retrieval / api / client …
 
 pwsh -File install.ps1 -DryRun         # 只看要改什么，不落盘

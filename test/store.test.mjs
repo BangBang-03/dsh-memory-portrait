@@ -18,6 +18,7 @@ const {
   similarity,
   rankRecords,
   renderMarkdown,
+  portableSnapshot,
   pathWorkspaceKey,
   decayFactor,
   CATEGORIES,
@@ -658,10 +659,69 @@ test('renderMarkdown: 含标题、分组与置顶区', () => {
     { id: '2', title: 'F', content: 'c2', category: 'fact', tags: ['t'], pinned: false, archived: false, updatedAt: new Date().toISOString() },
     { id: '3', title: 'Gone', content: 'c3', category: 'note', tags: [], pinned: false, archived: true, updatedAt: new Date().toISOString() },
   ], { root: WS_A });
-  assert.ok(md.includes('# 工作区长期记忆'));
+  assert.ok(md.includes('# 项目记忆'));
   assert.ok(md.includes('## 置顶'));
   assert.ok(md.includes('## 事实（fact）'));
   assert.ok(!md.includes('Gone'), '归档记录不进镜像');
+});
+
+test('renderMarkdown: 文件头声明边界而非禁止编辑（离线场景要能接手）', () => {
+  const md = renderMarkdown([], { root: WS_A });
+  assert.match(md, /没装插件时可以直接改/, '离线读者要知道这份文件能维护');
+  assert.match(md, /以条目库为准合并/, '说清改了之后会发生什么');
+  assert.match(md, /memory-snapshot\.json/, '指明完整条目在哪');
+  assert.doesNotMatch(md, /请勿手工编辑/, '不能劝退唯一的维护者');
+});
+
+test('renderMarkdown: 画像段落排在条目之前，红线单独成节且带理由', () => {
+  const md = renderMarkdown(
+    [
+      { id: 'c1', title: '不许动红线治理链', content: '红线只能从面板确认修改。', category: 'constraint', pinned: false, archived: false, updatedAt: '2026-11-01T00:00:00Z', reason: '模型一句话就能删掉用户的绝对禁令' },
+      { id: 'f1', title: '构建用 pnpm', content: '改完客户端跑 pnpm build。', category: 'convention', pinned: false, archived: false, updatedAt: '2026-11-02T00:00:00Z' },
+    ],
+    {
+      root: WS_A,
+      portrait: {
+        scope: 'workspace',
+        sections: [
+          { key: 'background', title: '工作背景', text: 'DSH 的记忆插件，宿主半 + 客户端半。' },
+          { key: 'focus', title: '当前关注', text: '正在做项目记忆的离线载体。' },
+        ],
+      },
+    },
+  );
+  const idxBackground = md.indexOf('## 项目概况');
+  const idxConstraint = md.indexOf('## 不能碰的规矩');
+  const idxConvention = md.indexOf('## 约定（convention）');
+  assert.ok(idxBackground > 0 && idxBackground < idxConstraint, '画像应在条目之前');
+  assert.ok(idxConstraint < idxConvention, '红线排在普通约定之前');
+  assert.match(md, /DSH 的记忆插件/, '画像正文要渲染出来');
+  assert.match(md, /为什么：模型一句话就能删掉用户的绝对禁令/, '红线要带理由');
+  assert.doesNotMatch(md, /红线只能从面板确认修改[\s\S]*## 约定[\s\S]*红线只能从面板确认修改/, '红线不得重复出现在普通分类里');
+});
+
+test('renderMarkdown: 全量输出，不截断正文也不丢条目', () => {
+  const long = '长'.repeat(200);
+  const many = Array.from({ length: 45 }, (_, i) => ({
+    id: `n${i}`,
+    title: `笔记 ${i}`,
+    content: '内容',
+    category: 'note',
+    pinned: false,
+    archived: false,
+    updatedAt: '2026-11-01T00:00:00Z',
+  }));
+  const md = renderMarkdown(
+    [
+      { id: 'a', title: 'A', content: long, category: 'fact', pinned: false, archived: false, updatedAt: '2026-11-01T00:00:00Z' },
+      ...many,
+    ],
+    { root: WS_A },
+  );
+  assert.ok(md.includes(long), '长正文要完整保留：镜像只此一份，压缩等于丢信息');
+  assert.doesNotMatch(md, /另有 \d+ 条同类未列出/, '不该出现截断提示');
+  const listed = many.filter((r) => md.includes(`- **${r.title}**`)).length;
+  assert.equal(listed, 45, '45 条同类应全部列出');
 });
 
 test('renderMarkdown: 空列表不抛错', () => {
@@ -820,7 +880,7 @@ test('镜像：开启时真的写进工作区 .dsh-memory/MEMORY.md', () => {
   assert.ok(fs.existsSync(file), `期望 ${file} 存在`);
   const text = fs.readFileSync(file, 'utf8');
   assert.ok(text.includes('工作区镜像'), '标题在镜像里');
-  assert.ok(text.includes('由 dsh-memory 自动生成'), '带自动生成声明');
+  assert.ok(text.includes('由 dsh-memory 维护'), '带来源声明');
   assert.equal(s.mirrorInfo(ws).workspaceExists, true);
   assert.ok(s.mirrorInfo(ws).workspaceFile.endsWith(path.join('.dsh-memory', 'MEMORY.md')));
 });
@@ -902,6 +962,184 @@ test('镜像：removeWorkspaceMirror 显式撤掉文件（设置关掉镜像时�
   assert.equal(s.mirrorInfo(ws).workspaceExists, false);
   assert.equal(s.removeWorkspaceMirror(ws), false, '再撤一次返回 false');
   assert.equal(s.removeWorkspaceMirror(''), false, '全局记忆没有工作区镜像');
+});
+
+/* ---------------- 工作区可携带快照（memory-snapshot.json） ---------------- */
+
+const SNAPSHOT = 'memory-snapshot.json';
+const snapshotPath = (ws) => path.join(ws, '.dsh-memory', SNAPSHOT);
+const readSnapshot = (ws) => JSON.parse(fs.readFileSync(snapshotPath(ws), 'utf8'));
+
+test('快照：与 MEMORY.md 同目录落盘，带合并所需的结构化字段', () => {
+  const ws = makeWorkspace('snap-basic');
+  const s = createMemoryStore({ dir: path.join(tmp, 'snap-basic-store'), mirror: true });
+  const rec = s.upsert(
+    {
+      title: '合并需要 id',
+      content: 'Markdown 只有标题和一句话，跨机器合并要靠 id、trust、confidence。',
+      category: 'convention',
+      tags: ['snapshot'],
+      source: 'user',
+    },
+    { workspace: ws },
+  ).record;
+
+  const snap = readSnapshot(ws);
+  assert.equal(snap.kind, 'dsh-memory-snapshot');
+  assert.equal(snap.workspace, path.resolve(ws));
+  assert.equal(snap.count, 1);
+  const row = snap.records[0];
+  assert.equal(row.id, rec.id, 'id 必须保留，否则合并只能靠标题猜');
+  assert.equal(row.trust, rec.trust, 'trust 必须保留，否则外来版本可能把隔离洗白');
+  assert.equal(row.confidence, rec.confidence);
+  assert.ok(row.tags.includes('snapshot'));
+  assert.equal(s.mirrorInfo(ws).snapshotExists, true);
+});
+
+test('快照：不含本机使用统计（否则会把另一台机器的排序污染）', () => {
+  const ws = makeWorkspace('snap-stats');
+  const s = createMemoryStore({ dir: path.join(tmp, 'snap-stats-store'), mirror: true });
+  const rec = s.upsert({ title: '带统计', content: '用过很多次的一条记忆。' }, { workspace: ws }).record;
+  s.markUsed([rec.id], { workspace: ws });
+  s.markUsed([rec.id], { workspace: ws });
+
+  const row = readSnapshot(ws).records[0];
+  for (const key of ['useCount', 'lastUsedAt', 'exposedCount', 'lastExposedAt', 'openedCount', 'citedCount']) {
+    assert.ok(!(key in row), `${key} 不该进快照`);
+  }
+});
+
+test('快照：全局记忆不写进任何工作区（项目记忆不外溢）', () => {
+  const ws = makeWorkspace('snap-scope');
+  const s = createMemoryStore({ dir: path.join(tmp, 'snap-scope-store'), mirror: true });
+  s.upsert({ title: '项目内', content: '这条属于工作区。' }, { workspace: ws });
+  s.upsert({ title: '全局偏好', content: '这条属于全局，不该出现在项目里。', scope: 'global' }, { workspace: '' });
+
+  const snap = readSnapshot(ws);
+  assert.equal(snap.count, 1, '快照只装本工作区');
+  assert.deepEqual(snap.records.map((r) => r.title), ['项目内']);
+  assert.ok(!JSON.stringify(snap).includes('全局偏好'));
+});
+
+test('快照：portableSnapshot 只收 active 记录，且按 id 稳定排序', () => {
+  const rows = [
+    { id: 'z9', title: 'Z', scope: 'workspace', status: 'active' },
+    { id: 'a1', title: 'A', scope: 'workspace', status: 'active' },
+    { id: 'g1', title: 'G', scope: 'global', status: 'active' },
+    { id: 'd1', title: 'D', scope: 'workspace', status: 'draft' },
+    { id: 'r1', title: 'R', scope: 'workspace', archived: true },
+  ];
+  const snap = portableSnapshot(rows, { root: '/ws', generatedAt: 'FIXED' });
+  assert.deepEqual(snap.records.map((r) => r.id), ['a1', 'z9'], '按 id 排序、全局/草稿/归档都不进');
+  assert.equal(snap.count, 2);
+});
+
+test('快照：内容没变就不重写（git 里不产生噪声 diff）', () => {
+  const ws = makeWorkspace('snap-stable');
+  const s = createMemoryStore({ dir: path.join(tmp, 'snap-stable-store'), mirror: true });
+  const rec = s.upsert({ title: '稳定', content: '内容不变时快照字节不变。' }, { workspace: ws }).record;
+  const before = fs.readFileSync(snapshotPath(ws), 'utf8');
+
+  s.markUsed([rec.id], { workspace: ws });
+  const afterUsed = fs.readFileSync(snapshotPath(ws), 'utf8');
+  assert.equal(afterUsed, before, 'markUsed 只刷本机统计，不该让快照变脏');
+
+  s.update(rec.id, { content: '这次真的改了内容。' }, { workspace: ws });
+  const afterEdit = fs.readFileSync(snapshotPath(ws), 'utf8');
+  assert.notEqual(afterEdit, before, '内容真变了就该重写');
+});
+
+test('快照：关掉镜像或删掉最后一条时一起撤掉，不留孤儿 JSON', () => {
+  const ws = makeWorkspace('snap-clean');
+  let on = true;
+  const s = createMemoryStore({ dir: path.join(tmp, 'snap-clean-store'), mirror: () => on });
+  const rec = s.upsert({ title: '待清', content: '关开关或删条目后快照都该消失。' }, { workspace: ws }).record;
+  assert.ok(fs.existsSync(snapshotPath(ws)));
+
+  on = false;
+  s.update(rec.id, { content: '触发一次写入。' }, { workspace: ws });
+  assert.equal(fs.existsSync(snapshotPath(ws)), false, '关开关后不该留 JSON');
+  assert.equal(fs.existsSync(path.join(ws, '.dsh-memory')), false, '空目录也应收掉');
+
+  on = true;
+  s.update(rec.id, { content: '再打开。' }, { workspace: ws });
+  assert.ok(fs.existsSync(snapshotPath(ws)));
+  s.remove(rec.id, { workspace: ws });
+  assert.equal(fs.existsSync(path.join(ws, '.dsh-memory')), false, '删除最后一条后目录清空');
+});
+
+/* ---------------- 全局候选原则池（二级蒸馏的中间层） ---------------- */
+
+const candStore = () => createMemoryStore({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-cand-')) });
+
+test('候选池：追加、同项目去重、不同项目各自保留', () => {
+  const s = candStore();
+  const first = s.candidates.add([
+    { text: '不可逆操作前必须先留可回滚快照', category: 'decision', topics: ['backup'], anchors: ['m1', 'm2'], project: 'ws-a' },
+    { text: '对外素材一律使用构造数据并标注', category: 'feedback', topics: ['privacy'], anchors: ['m3'], project: 'ws-a' },
+  ]);
+  assert.equal(first.added, 2);
+  assert.equal(first.skipped, 0);
+
+  // 同一项目、同一表述：不重复堆
+  const again = s.candidates.add([
+    { text: '不可逆操作前必须先留可回滚快照', category: 'decision', topics: ['backup'], anchors: ['m9'], project: 'ws-a' },
+  ]);
+  assert.equal(again.added, 0);
+  assert.equal(again.skipped, 1);
+  assert.equal(s.candidates.stats().total, 2);
+
+  // 不同项目、同一表述：必须各自留一条，否则共振永远只有 1 个项目
+  const other = s.candidates.add([
+    { text: '不可逆操作前必须先留可回滚快照', category: 'decision', topics: ['backup'], anchors: ['n1'], project: 'ws-b' },
+  ]);
+  assert.equal(other.added, 1);
+  assert.equal(s.candidates.stats().total, 3);
+});
+
+test('候选池：按状态过滤，标记后不再出现在待判定里', () => {
+  const s = candStore();
+  s.candidates.add([
+    { text: '改动必须验证再提交，不接受应该没问题', category: 'feedback', anchors: ['m1'], project: 'ws-a' },
+    { text: '后台任务不阻塞主流程，失败要冷却', category: 'decision', anchors: ['m2'], project: 'ws-a' },
+  ]);
+  assert.equal(s.candidates.list({ status: 'pending' }).length, 2);
+
+  const target = s.candidates.list({ status: 'pending' })[0];
+  assert.equal(s.candidates.mark([target.id], { status: 'promoted', promotedId: 'mem_x' }).affected, 1);
+  assert.equal(s.candidates.list({ status: 'pending' }).length, 1);
+
+  const promoted = s.candidates.list({ status: 'promoted' })[0];
+  assert.equal(promoted.promotedId, 'mem_x');
+  assert.ok(promoted.decidedAt, '应记录裁决时间');
+});
+
+test('候选池：拒绝要记原因；非法状态被挡住', () => {
+  const s = candStore();
+  s.candidates.add([{ text: '不想要的全局原则示例文本', category: 'convention', anchors: ['m1'], project: 'ws-a' }]);
+  const id = s.candidates.list()[0].id;
+
+  const bad = s.candidates.mark([id], { status: 'whatever' });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.error, 'bad_status');
+
+  assert.equal(s.candidates.mark([id], { status: 'rejected', rejectReason: '不适用' }).affected, 1);
+  const rejected = s.candidates.list({ status: 'rejected' })[0];
+  assert.equal(rejected.rejectReason, '不适用');
+});
+
+test('候选池：文件不存在或损坏时降级为空，且下一次写入能重建', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-cand-bad-'));
+  const s = createMemoryStore({ dir });
+  assert.deepEqual(s.candidates.list(), [], '空库应返回空数组');
+
+  const file = path.join(dir, 'workspaces', '_global', 'candidates.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, '{ 这不是 json', 'utf8');
+  assert.deepEqual(s.candidates.list(), [], '损坏的候选池不该抛错——它丢了只是丢一批待审原则');
+
+  assert.equal(s.candidates.add([{ text: '坏文件之后还能重建候选池', project: 'ws-a' }]).added, 1);
+  assert.equal(s.candidates.stats().total, 1);
 });
 
 /* ---------------- v0.3.0：版本链 / 草稿 / 体检 / 索引简报 ---------------- */

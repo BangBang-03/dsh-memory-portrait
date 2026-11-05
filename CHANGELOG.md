@@ -2,6 +2,22 @@
 
 本项目的用户可见变更。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循 SemVer；日期用 `Asia/Shanghai`。
 
+## [Unreleased]
+
+### Added
+
+- 工作区可携带副本：`<工作区>/.dsh-memory/` 下新增 `memory-snapshot.json`（结构化全量，保留 `id` / `trust` / `confidence` / 版本链，供另一台机器合并），与既有的 `MEMORY.md` 并列。两份都只装**本工作区**的记录，全局记忆留在本地，不跟着项目进仓库；内容未变时不重写，git 里只在真变更时出现 diff。
+- 镜像改版：`MEMORY.md` 按「离线也能读」重新组织——项目概况与当前关注（来自工作区画像）排在所有条目前面，红线单独成节且措辞逐字保留，每条带「为什么」，文件头从「请勿手工编辑」改成边界声明（没装插件时可以直接改，插件上线后以条目库为准合并）。
+- 历史工作区补写：主库里有该项目的记忆、但项目目录下还没有 `.dsh-memory/` 时，打开项目会自动补齐镜像与快照（只在确实有记忆时才建目录）。
+- 二级蒸馏：Dream 时用一次模型调用把本项目记忆抽成「候选原则」，够格的自动升为全局记忆。门槛按证据强度分层——`constraint` / `feedback` / `preference` 是用户亲口说的，单项目即可；`decision` / `convention` 是推断出来的，需要第二个项目交叉验证。维护页新增「全局候选池」卡，显示待判定条数并支持逐条「不再提议」（一次点击，无二次确认）。
+- 新增设置 `globalDistill`（默认 `true`）：关掉只是不再往上抽，已进池的候选照常按门槛晋升。
+- 新增端点 `POST /candidates/reject`（`{ ids, reason? }`）。
+
+### Changed
+
+- `GET /health` 的 `health` 内新增 `candidates`（待判定 / 已晋升 / 已否计数）与 `candidateItems`（待判定明细）。
+- `POST /dream` 现在包含二级蒸馏与全局原则晋升两步，顺序为先产候选、再判定晋升。
+
 ## [0.7.0] - 2026-11-01
 
 ### Changed

@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![npm](https://img.shields.io/npm/v/@bangbang-03/dsh-memory?color=4d6bfe&label=npm)](https://www.npmjs.com/package/@bangbang-03/dsh-memory)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-597%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-641%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 **DSH 的记忆画像：不是记住更多，而是让你看见它怎么理解你。**<br>
 **Long-term memory for DeepSeek Harness, with a portrait you can inspect.**
@@ -144,7 +144,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | `autoInject` | `true` | 注入总闸：关掉后简报 / 轮末召回 / 路径召回都不再进上下文，`memory` 工具照常读写（「只用工具」档） |
 | `directory` | `""` | 数据库位置，空 = `~/.dsh/storages/dsh-memory` |
 | `disabledWorkspaces` | `[]` | 停用自动记忆的工作区（绝对路径，归一后精确匹配）：不注入、不自动提炼；工具仍可手动读写。事故排查时也用它把一次性工作区摘出去 |
-| `mirror` | `true` | 在工作区写 `.dsh-memory/MEMORY.md` |
+| `mirror` | `true` | 在工作区写 `.dsh-memory/MEMORY.md`（人读）+ `memory-snapshot.json`（结构化，供跨机器携带项目记忆） |
 | `briefing` | `true` | 会话开始注入记忆简报 |
 | `briefMode` | `"index"` | `index` 一行一条索引（省 token）；`full` 标题+正文摘录；`portrait` 全局画像全量（工作区画像已撤）+ 索引清单 |
 | `briefingLimit` | `12` | 注入条数上限（1–50） |
@@ -161,6 +161,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | `autoCapture` | `false` | 轮次结束自动提炼 |
 | `autoDreamDays` | `7` | 启动整理：启动时与轮末检查当前（最近使用的）工作区，距上次（自动或手动）整理满 N 天就在后台整理一次；`0` 关闭（0–365）。没有常驻定时器 |
 | `autoDreamPortrait` | `false` | 自动整理（启动时）是否顺带重写画像；默认关——画像由 `autoPortraitHours` 自动刷新负责。手动 Dream 仍会刷新一版进待审 |
+| `globalDistill` | `true` | 二级蒸馏：Dream 时用一次模型调用，把本项目记忆抽成「候选原则」写进全局候选池。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
 | `autoPortraitHours` | `6` | 自动刷新全局画像：每 N 小时检查一次，有新素材时调用模型重写；`0` 关闭（0–168）。面板「立即刷新」只是兜底 |
 | `captureMode` | `"direct"` | `direct` 直接落库；`draft` 先进待审队列 |
 | `staleDays` | `60` | 体检里「过期未用」的判定天数 |
@@ -201,7 +202,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | GET | `/redline/history` | 红线当前版本 + 旧版本列表 |
 | POST | `/redline/rollback` | 红线回滚（必须 `confirm: true`；当前版本先写回历史） |
 | POST | `/settings` | 写设置 |
-| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态） |
+| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态）与 `candidates` / `candidateItems`（二级蒸馏候选池：待判定计数与明细，供维护页渲染） |
 | POST | `/health/resolve` | 一键处理：`merge`（合并簇，可带 `title/category/tags/content` 覆盖合并稿；红线与矛盾对会被拒绝）/ `time-order`（对一对矛盾按时序归档旧条，红线 / 置顶 / 用户旧条 / 外部新条会被拒绝）/ `archive`（归档过期）/ `unlink`（摘除断链） |
 | GET | `/timeline` | 全部记忆（含归档、不含草稿）按更新时间倒序 |
 | GET | `/portrait` | 当前画像（工作区 + 全局）、版本列表、段落定义 |
@@ -226,7 +227,8 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | POST | `/import-scan` | 按来源 id 或路径导入，用户级来源自动进全局库 |
 | GET | `/mirror` | 取当前工作区镜像的 Markdown |
 | POST | `/capture` | 立刻提炼一次（`captureMode` 决定落库还是进队列） |
-| POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用 + 画像重写进待审 |
+| POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用 + 二级蒸馏与全局原则晋升 + 画像重写进待审 |
+| POST | `/candidates/reject` | 「不再提议」：把候选原则标成 rejected，之后同主题不再晋升。`{ ids, reason? }`。自动路径不弹确认，纠错就靠这一个动作 |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
 | GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + 当前 `hudIcon` 图标键（卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
 | GET | `/injections` | 注入审计：最近真正进 prompt 的内容（正文预览 + sha256 前 16 位 + id 列表 + 被挤掉的条目；`full=1` 给原文，`kind` 可过滤） |
@@ -253,18 +255,22 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
   workspaces/<目录名>-<hash>/derivations.json 跨层派生链
   workspaces/<目录名>-<hash>/journal/         每天一个只追加的工作日志
   workspaces/_global/memories.json            跨工作区共享的全局记忆
+  workspaces/_global/candidates.json          二级蒸馏的候选原则池（等跨项目共振）
   backups/<时间戳>-<原因>/                     整库快照（每天一次 + 每次 Dream 前）
 ```
 
 - 主库只落 `~/.dsh/storages/dsh-memory`，默认不进仓库。
-- 打开 `mirror` 才在 `<工作区>/.dsh-memory/MEMORY.md` 写人读副本；关掉会撤回。
+- 打开 `mirror` 才在 `<工作区>/.dsh-memory/` 写两份文件。**没装插件的机器上，这两份就是唯一的项目记忆入口**：
+  - `MEMORY.md`：项目概况（画像）→ 当前关注 → 不能碰的规矩 → 置顶 → 分类条目，**全量不截断**。有变更时整份重写；内容不变时字节不变，git 里只在真变更时出现 diff。
+  - `memory-snapshot.json`：结构化全量，保留 `id` / `trust` / `confidence` / 版本链，供另一台机器合并。
+- 关掉 `mirror` 两份一起撤回；两份都只装**本工作区**的记录，全局记忆留在本地，不跟着项目进仓库。
 - 每条写入路径都过 `lib/security.js`：密钥脱敏 + 注入模式 taint；非 user 来源 taint 隔离成草稿。
 - 非回环来源访问 `/memory/api` 一律 403。
 
 ## 测试
 
 ```powershell
-npm test   # 14 个套件 / 597 项断言
+npm test   # 15 个套件 / 642 项断言
 ```
 
 - 检索：54 条记忆 × 60 条查询硬评测，Recall@5 1.000、MRR@10 0.930（自测口径，见 [评测说明](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/retrieval-eval-2026-10-20.md)）。

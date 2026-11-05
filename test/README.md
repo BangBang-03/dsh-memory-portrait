@@ -1,10 +1,10 @@
 # test
 
 全部测试都是脱离 DSH 的独立 `.mjs`，自带断言与计数，失败即 `exit 1`。
-当前 **14 个套件 / 581 条断言**。
+当前 **15 个套件 / 642 条断言**。
 
 ```powershell
-node test/run-all.mjs        # 14 个套件全跑（改完代码必跑）
+node test/run-all.mjs        # 15 个套件全跑（改完代码必跑）
 node test/store.test.mjs     # 单跑一个：换成 retrieval / api / client …
 ```
 
@@ -18,6 +18,7 @@ node test/store.test.mjs     # 单跑一个：换成 retrieval / api / client �
 | `portrait` | 画像段落模型、Markdown 渲染 / 解析、预算截断 |
 | `markdown` | 既有记忆解析（WorkBuddy / Qoder / 纯文本 / 本机扫描） |
 | `distill` | 对话摘录、模型输出解析、触发条件 |
+| `distill-global` | 候选原则准入（项目载体 / 套话 / 长度）、按证据强度分层晋升门槛、主题词聚类与项目去重 |
 | `api` | HTTP 契约、错误码、参数校验、单条读取与红线审计接口（`/record`、`/redline/*`）、Dream 矛盾报告与 `/health/resolve time-order` |
 | `host` | 宿主半导出、Config 默认值与校验 |
 | `activate` | 假 cordis 跑 `apply()`：工具、提示段、路由真的能用；启动整理（合并 / 台账 / 快照）；自动刷新全局画像（吸收当前工作区近况 + 6h 节流） |
