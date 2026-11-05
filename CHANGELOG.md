@@ -2,7 +2,7 @@
 
 本项目的用户可见变更。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循 SemVer；日期用 `Asia/Shanghai`。
 
-## [Unreleased]
+## [0.8.0] - 2026-11-05
 
 ### Added
 
