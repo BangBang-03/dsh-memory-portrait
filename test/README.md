@@ -1,7 +1,7 @@
 # test
 
 全部测试都是脱离 DSH 的独立 `.mjs`，自带断言与计数，失败即 `exit 1`。
-当前 **15 个套件 / 646 条断言**。
+当前 **15 个套件 / 648 条断言**。
 
 ```powershell
 node test/run-all.mjs        # 15 个套件全跑（改完代码必跑）
@@ -29,6 +29,7 @@ node test/store.test.mjs     # 单跑一个：换成 retrieval / api / client �
 ## 约定
 
 - 新增套件：在本目录建 `<name>.test.mjs`，并把 `[name, 描述]` 加进 `run-all.mjs` 的 `suites` 数组。
+- 断言条数变化时不用手工数：`run-all` 跑完会比对文档里的数字，不一致会红并列出是哪 7 个文件里的哪种写法。
 - `mini-react.mjs` 是给 `client.test.mjs` 用的极小 React 替身（`createElement` + 5 个 hook），
   不是通用实现，只在 DSH 之外把设置页真的渲染出来。
 - `fixtures/` 放测试数据，见 [fixtures/README.md](fixtures/README.md)。

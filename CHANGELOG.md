@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `test/run-all.mjs` 现在校验文档里的断言总数：跑完测试后把实际累加值与 README 徽章、AGENTS、CONTRIBUTING、`lib/README.md`、`skills/release/SKILL.md`、`docs/REFERENCE.md`、`test/README.md` 里的每一处比对，不一致直接红并列出文件与写法。校验逻辑抽在 `tools/doc-numbers.mjs`，自带单测（三种写法识别 + 套件数）。这个数字以前靠 `sed` 手工同步 8 个文件，2026-11-06 的自查里连漏 3 轮。
+
 ### Changed
 
 - 二级蒸馏的触发时机从「整理时顺带」改成「**模型决断**」：新增 `memory` 工具的 `distill-global` 动作，模型在一段工作告一段落时可显式提炼。兜底是轮末——可蒸馏素材比上次多了 5 条就自动提炼一次。整理（Dream）不再顺带蒸馏：它是个 7 天的定时任务，要么太早（素材不够，提不出东西），要么太晚（已经忘了为什么）。

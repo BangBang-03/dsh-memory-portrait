@@ -4,7 +4,10 @@
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { checkLocal } from '../tools/check-compat.mjs';
+import { verifyDocNumbers } from '../tools/doc-numbers.mjs';
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -91,6 +94,37 @@ check('C7 文档覆盖：每个配置键都在 README 与 REFERENCE 的配置表
     const missing = keys.filter((key) => !documented.has(key));
     assert.equal(missing.length, 0, `${file} 配置表缺少：${missing.join(', ')}`);
   }
+});
+
+/**
+ * 校验器自身的测试。
+ *
+ * 这道闸守的是「测试全绿但文档写错数字」，如果它自己写错了，问题只会更隐蔽——
+ * 所以它必须被测到，而不是只靠人工跑一次确认能过。
+ */
+check('文档数字校验器：徽章 / 断言 / 套件明细三种写法都能识别', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-docnum-'));
+  fs.writeFileSync(
+    path.join(dir, 'doc.md'),
+    [
+      '![Tests](https://img.shields.io/badge/tests-100%20passed-blue)',
+      '全部 15 个套件通过，100 条断言。',
+      '15 个套件、100 项（明细可能滞后）。',
+    ].join('\n'),
+    'utf8',
+  );
+  const files = ['doc.md'];
+  assert.deepEqual(verifyDocNumbers(dir, { total: 100, suites: 15, files }), []);
+  const bad = verifyDocNumbers(dir, { total: 200, suites: 15, files });
+  assert.equal(bad.length, 3, '三种写法各报一次，不能合并成一条也不能漏');
+});
+
+check('文档数字校验器：套件数写错也会被抓到', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-docnum2-'));
+  fs.writeFileSync(path.join(dir, 'doc.md'), '全部 14 个套件通过，100 条断言。', 'utf8');
+  const problems = verifyDocNumbers(dir, { total: 100, suites: 15, files: ['doc.md'] });
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /套件数.*14.*15/);
 });
 
 check('Config 接受停用工作区名单', () => {

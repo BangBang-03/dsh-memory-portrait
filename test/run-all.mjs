@@ -2,13 +2,21 @@
  * 一次跑完 dsh-memory 的全部测试套件。
  *   node test/run-all.mjs
  * 任一子套件失败即 exit 1。
+ *
+ * 除了跑测试，它还做一件事：**校验文档里的断言总数**。
+ * 这个数字以前靠 sed 手工同步 8 个文件，必然滞后——2026-11-06 的自查里就漏改了 3 轮
+ * （`tests-641%20passed`、`15 个套件 644 条` 这些写法 sed 覆盖不到）。
+ * 这里读实际累加值，和文档里的每一处比对，不一致直接红。
  */
 
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { verifyDocNumbers } from '../tools/doc-numbers.mjs';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(here, '..');
 
 const suites = [
   ['store', '存储层：工作区分库、去重合并、检索、镜像、导入导出'],
@@ -29,19 +37,41 @@ const suites = [
 ];
 
 let failed = 0;
+let total = 0;
 
 for (const [name, description] of suites) {
   console.log(`\n=== ${name} — ${description} ===`);
   const result = spawnSync(process.execPath, [path.join(here, `${name}.test.mjs`)], {
-    stdio: 'inherit',
-    cwd: path.resolve(here, '..'),
+    encoding: 'utf8',
+    cwd: root,
   });
+  /* 先转发输出，再统计——顺序不能反，否则看日志的人看不到失败上下文。 */
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+
+  const hit = String(result.stdout || '').match(/(\d+)\s+passed/);
+  if (hit) total += Number(hit[1]);
   if (result.status !== 0) failed += 1;
 }
 
 console.log('');
 if (failed > 0) {
-  console.log(`${failed} 个套件失败`);
+  console.log(`${failed} 个套件失败（实际跑出 ${total} 条断言）`);
   process.exit(1);
 }
-console.log(`全部 ${suites.length} 个套件通过`);
+
+/*
+ * 文档校验放在测试全绿之后：测试红的时候数字对不上是次要问题，
+ * 先让人去看失败用例，别被一堆「文档不一致」淹没。
+ */
+const docProblems = verifyDocNumbers(root, { total, suites: suites.length });
+if (docProblems.length) {
+  console.log(`文档数字与实际不一致（实际 ${suites.length} 套件 / ${total} 断言）：`);
+  for (const problem of docProblems) console.log(`  - ${problem}`);
+  console.log('');
+  console.log('改了测试条数就同步 README / AGENTS / CONTRIBUTING / lib/README /');
+  console.log('skills/release / docs/REFERENCE / test/README 这 7 个文件；漏了会在这里红。');
+  process.exit(1);
+}
+
+console.log(`全部 ${suites.length} 个套件通过，${total} 条断言；文档数字一致。`);
