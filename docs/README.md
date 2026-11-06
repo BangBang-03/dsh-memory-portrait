@@ -9,6 +9,7 @@
 | `briefing-cache-safety.md` | 简报为什么必须字节稳定：会话级冻结、确定性排序与缓存命中率的代价 |
 | `retrieval-eval-2026-10-20.md` | 检索方案与 60 条评测的基线数字 |
 | `personal-memory-parity.md` | 与 WorkBuddy 个人记忆的能力差距 |
+| `global-distill-trial-2026-11-05.md` | 二级蒸馏试跑：122 条记忆产出 4 条原则的实测与淘汰分析，晋升门槛的来源 |
 | `market-scan-2026-10.md` | 市场同类插件扫描与插件自查 |
 | `dsh-memory-landscape-2026-10.md` | 同类产品全景 |
 | `competitive-delta-2026-10-20.md` | 头部产品近月新机制、可借鉴清单与优先级 |

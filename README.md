@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![npm](https://img.shields.io/npm/v/@bangbang-03/dsh-memory?color=4d6bfe&label=npm)](https://www.npmjs.com/package/@bangbang-03/dsh-memory)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-641%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-646%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 **DSH 的记忆画像：不是记住更多，而是让你看见它怎么理解你。**<br>
 **Long-term memory for DeepSeek Harness, with a portrait you can inspect.**
@@ -94,11 +94,12 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | 通路 | 触发 | 做什么 |
 | --- | --- | --- |
 | 简报 | 会话开始 | `briefMode: index` 一行一条；正文按需 `memory get/search` |
-| `memory` 工具 | 任何时候 | save/search/sessions/promote/list/get/update/forget/stats |
+| `memory` 工具 | 任何时候 | save/search/sessions/promote/list/get/update/forget/stats/distill-global |
 | 轮末召回 | `turn/end` | 当轮用户消息本地检索，命中项下一轮尾部注入；纯本地 0 token |
 | 路径 JIT | 工具触达 `files` | 相关记忆在下一步尾部注入；全路径 > 目录后缀 > 同名 |
 | 自动提炼 | 轮次结束（可选） | 结构化记忆；`captureMode: draft` 先进审批队列 |
-| Dream / 画像 | 启动 + 轮末到期检查 | 合并重复簇、报告矛盾、报告过期；画像按 6 小时自动刷新 |
+| 二级蒸馏 | 模型判断，或素材攒够 5 条 | 把本项目的教训抽成**跨项目**原则：`constraint` / `feedback` / `preference` 是用户亲口说的，单项目即可晋升；`decision` / `convention` 是推断出来的，要第二个项目交叉验证。够格的自动升为全局记忆，维护页可看、可「不再提议」 |
+| Dream / 画像 | 启动 + 轮末到期检查 | 合并重复簇、报告矛盾、报告过期、全局原则晋升判定；画像按 6 小时自动刷新 |
 | 前台会话卡 | 仅当前对话（可收起） | 右下角悬浮卡：图标 + 「更新于 YYYY-MM-DD HH:MM」+ 一段话摘要（本会话沉淀的记忆标题连成一句，草稿不可见）；图标在设置里可选 7 种，默认官方鲸鱼标；可拖拽，位置本地记住；切到设置 / 插件 / 自动化任务页自动隐藏，切对话自动换摘要；设置 → 记忆可用「该对话记忆」单独关闭本对话 |
 
 简报的排序不读 `useCount` / 当前时间，日期戳只用 `createdAt`，并且**会话级冻结**。这样同一会话的系统提示不会逐轮变化，前缀缓存不会因为记忆更新而整段作废。
@@ -270,7 +271,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 ## 测试
 
 ```powershell
-npm test   # 15 个套件 / 644 项断言
+npm test   # 15 个套件 / 646 项断言
 ```
 
 - 检索：54 条记忆 × 60 条查询硬评测，Recall@5 1.000、MRR@10 0.930（自测口径，见 [评测说明](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/retrieval-eval-2026-10-20.md)）。

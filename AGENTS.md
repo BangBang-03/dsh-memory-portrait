@@ -55,7 +55,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | **P3** | git 与 REST 两条推送通道**不要混用** | REST 重建的提交时区归一成 `+0000`，同树不同 SHA，混推就是分叉 |
 | **P4** | 改 `~/.dsh/profiles/**` 前必须备份（`install.ps1` 自带秒级时间戳备份，手工改也要先备份） | 把用户的 DSH 装坏且无从回滚 |
 | **P5** | 卸载 / 替换只动 junction 与清单项；碰到同名**真实目录**直接报错退出，不许 `Remove-Item -Recurse` | PowerShell 5.1 会跟进 junction 删到共享的 `@deepseek-ai/*`（脚本里已专门防这一步） |
-| **P6** | 改完跑 `node test/run-all.mjs`（15 套件 / 644 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
+| **P6** | 改完跑 `node test/run-all.mjs`（15 套件 / 646 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
 | **P7** | 不加运行时依赖：`dependencies` 保持空，`peerDependencies` 全 optional，`lib/*.js` 只许 import `node:*` 与相对路径 | 插件要在用户机器上零安装；加依赖等于要求所有人重装 |
 | **P8** | 正式版只在 `main` 打 `v*` 标签，且 `package.json` 不许是预发布号（`-lab.N` / `-rc.N` 等）；打标签前 `main` 必须已推送并通过测试；不手改远端保护设置 | 标签挂在旧提交上，`/releases/latest` 发出去的就是旧代码；预发布号漏上去再也升不回来。完整步骤与验收见 `skills/release/SKILL.md` |
 
@@ -134,6 +134,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 检索方案与基线数字 | `docs/retrieval-eval-2026-10-20.md` |
 | 简报为什么必须字节稳定 | `docs/briefing-cache-safety.md` |
 | 与 WorkBuddy 个人记忆的差距 | `docs/personal-memory-parity.md` |
+| 二级蒸馏的产出密度与晋升门槛为什么这样定 | `docs/global-distill-trial-2026-11-05.md` |
 | 市场同类扫描、插件自查与竞品 | `docs/market-scan-2026-10.md`、`docs/dsh-memory-landscape-2026-10.md` |
 | 头部这一个月的新机制、可抄清单与优先级 | `docs/competitive-delta-2026-10-20.md` |
 | 市场实时榜与**分发堵点复盘**（2026-10-27 快照；npmjs 0.6.9 已发） | `docs/market-top10-2026-10-27.md` |
@@ -155,7 +156,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 ## 3. 命令速查
 
 ```powershell
-node test/run-all.mjs                  # 15 套件 / 644 断言，改完必跑（P6）
+node test/run-all.mjs                  # 15 套件 / 646 断言，改完必跑（P6）
 node test/store.test.mjs               # 单套件：把 store 换成 retrieval / api / client …
 
 pwsh -File install.ps1 -DryRun         # 只看要改什么，不落盘

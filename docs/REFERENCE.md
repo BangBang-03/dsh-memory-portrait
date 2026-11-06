@@ -11,7 +11,7 @@
 
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-641%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-646%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 DSH 的**工作区长期记忆**插件。对标 Qoder / WorkBuddy / ZCode 的记忆交互：记忆以当前工作区为单位落库，
 会话开始时把最重要的几条以**索引**形式注入系统提示（一行一条，正文按需用 `memory` 工具取，省 token），
@@ -312,7 +312,7 @@ pwsh -File uninstall.ps1 -PurgeStorage   # 连 ~/.dsh/storages/dsh-memory 一起
 ```powershell
 git checkout lab                       # 默认分支；平时只在这里动
 # …改代码…
-node test/run-all.mjs                  # 本机跑一遍：15 个套件 644 条断言
+node test/run-all.mjs                  # 本机跑一遍：15 个套件 646 条断言
 git add <改动的文件>; git commit -m "feat: …"   # 不要用 git add -A（.probe/ 是本地材料）
 
 $out = node tools/push.mjs --branch lab; $out   # 输出 base = 上一版在本地的对应提交
@@ -679,9 +679,9 @@ cd <克隆下来的 dsh-memory 目录>
 npm test          # 或 node test/run-all.mjs
 ```
 
-15 个套件、641 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
+15 个套件、646 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
 
-- `store` 155 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
+- `store` 168 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
   工作区不存在时不造目录）、导入导出、并发写；v0.3.0：版本链 supersede/rollback、user 类别强制全局与跨库迁移、
   草稿四不可见、重复簇聚类与合并、体检（重复/过期/断链/草稿）、索引简报预算、镜像版本链线索、keywords 加权、unlink；
   v0.5.0：日志层 journal（按天 `journal/YYYY-MM-DD.md`、只追加，是画像重写的上游原料）、画像的读写与草稿；
@@ -711,13 +711,16 @@ npm test          # 或 node test/run-all.mjs
   Claude 的索引页剔除）。
 - `distill` 42 项 —— 摘录裁剪、模型输出解析容错、触发条件、显式提示词识别；v0.3.0：
   keywords/supersedes 解析、user 类别强制 global、提示词 v2 指引、existingRecords 带 id。
-- `api` 85 项 —— 51 个端点（49 条路径）、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
+- `distill-global` 25 项 —— 二级蒸馏的判定层：候选准入（项目载体 / 常识套话 / 长度）、
+  按证据强度分层的晋升门槛（constraint / feedback / preference 单项目即可，decision / convention 要第二个项目）、
+  主题词聚类与项目去重、模型输出解析容错，以及「候选池 → 晋升」的端到端链路。
+- `api` 88 项 —— 48 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
   /health 与 /health/resolve、/timeline、草稿队列（批准带编辑 / 拒绝 / 带 supersedes 的批准兑现版本链）、
   /save 带 supersedes 与 /supersede/rollback；v0.6：`GET /portrait/diff`（上一版 → 当前版的逐段 diff）；
   0.6.4：`GET /record` 依据下钻、`/redline/check` 冲突检查、`/redline/update` 改稿审计、
   `/redline/history` 与 `/redline/rollback`、Dream 时序矛盾归档与 `/health/resolve time-order`。
-- `host` 18 项 —— 导出形状、Config 默认值与越界校验。
-- `activate` 55 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
+- `host` 19 项 —— 导出形状、Config 默认值与越界校验。
+- `activate` 59 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
   工具 save/search/get/forget、全文简报装不下时明说「只列了 N / M 条」、`/memory/api/*` 路由真的应答
   且守好 403/404、手动提炼端到端、面板保存落到工作区镜像、既有记忆扫描导入、数据目录不可用不炸外壳；
   v0.3.0：索引简报（带 id 不展开正文 + full 模式对照）、轮末召回（召回块出现、连续两轮不重复）、
@@ -727,7 +730,7 @@ npm test          # 或 node test/run-all.mjs
   画像重写容错：严格提示重试一次、两次都失败时的可读明细与脱敏日志、有损结果改送待审。
 - `briefing-stability` 15 项 —— 会话级冻结快照、确定性排序、轮末召回的尾部注入与去重；
   改检索算法时用它守住「系统提示字节稳定」。
-- `client` 68 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
+- `client` 69 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
   接到真实 `store` + `api` 上驱动交互（列表 / 搜索 / 新建 / 删除 / 置顶 / 中英文切换 / 后端报错）；
   档案视图的分区与两种排布、整篇编辑、整理、开关即时落库、时间线与维护 tab；
   0.6.4：三页签与首页四块（红线 / 画像 / 需要处理 / 原料抽屉）、红线专用编辑器（预览 / 冲突二次确认 /

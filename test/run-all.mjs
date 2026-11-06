@@ -20,7 +20,7 @@ const suites = [
   ['markdown', '既有记忆解析：WorkBuddy 笔记/日报、Qoder frontmatter、纯文本、本机扫描'],
   ['distill', '提炼层：对话摘录、模型输出解析、触发条件'],
   ['distill-global', '全局原则晋升：候选准入、分层门槛、主题聚类'],
-  ['api', 'HTTP 契约：43 个端点（含既有记忆扫描导入）、错误码、参数校验'],
+  ['api', 'HTTP 契约：48 个端点（含既有记忆扫描导入）、错误码、参数校验'],
   ['host', '宿主半：导出、Config 默认值与校验'],
   ['activate', '宿主半激活：假 cordis 跑 apply()，工具 / 提示段 / 路由真的能用'],
   ['briefing-stability', '简报稳定性：会话级冻结快照、确定性排序、轮末召回尾部注入'],

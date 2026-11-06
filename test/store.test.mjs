@@ -1142,6 +1142,45 @@ test('候选池：文件不存在或损坏时降级为空，且下一次写入�
   assert.equal(s.candidates.stats().total, 1);
 });
 
+test('候选池：已裁决的历史只留最近 200 条，pending 全留', () => {
+  const s = candStore();
+  const batch = Array.from({ length: 260 }, (_, i) => ({
+    text: `第 ${i} 条候选原则示例文本，足够长以通过长度检查`,
+    category: 'convention',
+    anchors: ['m1'],
+    project: 'ws-a',
+  }));
+  s.candidates.add(batch);
+  const pending = s.candidates.list({ status: 'pending' });
+  assert.equal(pending.length, 260, 'pending 要先全留');
+
+  // 全部标记为已否 → 触发裁剪
+  s.candidates.mark(pending.map((item) => item.id), { status: 'rejected', rejectReason: '批量' });
+  const kept = s.candidates.list();
+  assert.equal(kept.length, 200, '已裁决历史只保留最近 200 条');
+  assert.equal(s.candidates.stats().rejected, 200);
+});
+
+test('候选池：裁剪不会丢 pending，即使历史已经满了', () => {
+  const s = candStore();
+  s.candidates.add(
+    Array.from({ length: 210 }, (_, i) => ({
+      text: `历史候选 ${i} 的示例文本，足够长以通过长度检查`,
+      category: 'convention',
+      anchors: ['m1'],
+      project: 'ws-a',
+    })),
+  );
+  const all = s.candidates.list();
+  s.candidates.mark(all.map((item) => item.id), { status: 'rejected' });
+
+  s.candidates.add([{ text: '新的待判定候选，不该被历史挤掉', category: 'feedback', anchors: ['m2'], project: 'ws-b' }]);
+  const pending = s.candidates.list({ status: 'pending' });
+  assert.equal(pending.length, 1);
+  assert.match(pending[0].text, /新的待判定候选/);
+  assert.equal(s.candidates.list().length, 201, '200 条历史 + 1 条 pending');
+});
+
 /* ---------------- v0.3.0：版本链 / 草稿 / 体检 / 索引简报 ---------------- */
 
 /* 这一组全部用独立 store：列表/检索/体检都会合并全局库，共享实例会跨用例串数据。 */
