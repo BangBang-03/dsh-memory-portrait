@@ -11,6 +11,7 @@
 | `release-watch.mjs` | 只读：等 `v*` 标签触发的 Actions 跑完，核对 Release 是否 Latest、非预发布、资产齐全，并报告 npmjs 通道状态 |
 | `check-compat.mjs` | 只读：核对 `package.json`、README 兼容表；`--npm` 再核对 npmjs 上已发布的同一版本清单 |
 | `status.mjs` | 只读：默认分支、各分支头、最近 CI、最新正式版 |
+| `doc-numbers.mjs` | 只读：校验文档里的断言总数与套件数是否和实际一致；由 `test/run-all.mjs` 在测试全绿后调用，不一致就红 |
 
 ```powershell
 node tools/status.mjs                 # 先看状态

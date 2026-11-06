@@ -187,7 +187,7 @@ JWT / 私钥 / `Bearer` / `password: …` 赋值 / 带凭据的数据库 URI）�
 版本链：`save` 带 `supersedes`（或自动提炼识别出「情况已变」）时，新条生效、旧条归档并互指，
 面板里可以一键**回滚**——推翻不删除，历史一直在。
 
-## 五条记忆通路
+## 记忆通路
 
 1. **会话开始注入索引**（`briefing`）。系统提示里多一段 `dsh-memory:workspace-briefing`
    （order 550，夹在 PLAN_POLICY 500 与 TEAM_POLICY 600 之间）。默认 `briefMode: index`——
@@ -213,19 +213,29 @@ JWT / 私钥 / `Bearer` / `password: …` 赋值 / 带凭据的数据库 URI）�
    的安全子集（合并重复簇、按词法线索报告矛盾、报告过期）——没有常驻定时器，也不占对话轮次。
    画像则按 `autoPortraitHours`（默认 6 小时）在轮末 / 会话销毁时自动刷新全局画像（WorkBuddy 式主路径），
    面板「立即刷新」只是兜底。
-5. **路径 JIT**（`pathRecall`，默认开）。给记忆挂 `files`（`memory save` 新增 `files` 参数），
+5. **二级蒸馏：项目 → 全局**（`globalDistill`，默认开）。把本项目的记忆抽成**跨项目**原则：
+   只喂 `feedback` / `decision` / `preference` / `constraint` 四类（`fact` / `note` / `component` / `task`
+   基本不可上行，喂进去只会稀释判断）。模型产出 `text` / `category` / `topics` / `anchors`，经准入
+   （禁项目载体、禁常识套话、`topics` 必填）后落 `_global/candidates.json`。
+   晋升按**证据强度**分层：`constraint` / `feedback` / `preference` 是用户亲口说的，单项目即可；
+   `decision` / `convention` 是推断出来的，要第二个项目出现同主题才认。
+   触发**不是定时任务**——模型自己判断时机（`memory` 的 `distill-global` 动作），兜底是轮末还剩
+   ≥5 条没被任何候选 `anchors` 引用过的素材。候选池的已裁决历史只留最近 200 条（pending 全留）。
+   晋升出来的全局记忆是 `source: auto`、`confidence: 0.75`，维护页可逐条「不再提议」。
+
+6. **路径 JIT**（`pathRecall`，默认开）。给记忆挂 `files`（`memory save` 新增 `files` 参数），
    工具触达这些文件时（`tools/pre-execute` 只观察不裁决），相关记忆在**下一个 pre-step 以尾部消息注入**——
    「刚触达：`lib/store.js`。以下是挂在这些文件上的记忆……」。匹配强度：全路径 > 目录后缀 > 同名文件；
    简报里已有的、本轮已注入的不重复；同一批触达只注入一次。annkun / Gemini JIT 的文件触达式召回，本地零成本版。
 
    > **压缩协同**（`compactionSalvage`，默认开）：宿主压缩上下文（`compaction/summary` / `compaction/prune`）时，
    > 把压缩摘要照录进当天工作日志——长会话被压缩，结论也不丢（auto-memory 交接账本的本地轻量版）。
-6. **门控：什么时候不记忆**（`autoInject` + `disabledWorkspaces`）。`autoInject: false` 是注入总闸，
+7. **门控：什么时候不记忆**（`autoInject` + `disabledWorkspaces`）。`autoInject: false` 是注入总闸，
    简报 / 轮末召回 / 路径召回一起停，`memory` 工具照常读写——做敏感或一次性任务时用「只用工具」档。
    `disabledWorkspaces` 按**归一后的绝对路径**精确匹配，命中的工作区不注入、也不自动提炼；
    手动工具写入仍放行（显式意图不该被静默拒绝）。
    两道闸都在**入口**拦：简报返回空正文（与「一条记忆都没有」同一条路径），召回连缓冲区都不建。
-7. **轮末召回的问题闸**：当轮用户消息若是纯续跑（「继续」「好的，那就继续吧」「下一步」），不再为它跑检索。
+8. **轮末召回的问题闸**：当轮用户消息若是纯续跑（「继续」「好的，那就继续吧」「下一步」），不再为它跑检索。
    判据是纯本地的——归一后剥掉续跑词与虚词，剩下的实义字符 ≤ 2 才算续跑；长句和带内容的短指令照常召回。
 
 ## 安装
@@ -565,7 +575,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | POST | `/import-scan` | 按来源 id 或路径导入，用户级来源自动进全局库 |
 | GET | `/mirror` | 取当前工作区镜像的 Markdown |
 | POST | `/capture` | 立刻提炼一次（`captureMode` 决定落库还是进队列） |
-| POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用+ 二级蒸馏与全局原则晋升 + 画像重写进待审 |
+| POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用、二级蒸馏与全局原则晋升 + 画像重写进待审 |
 | POST | `/candidates/reject` | 「不再提议」：把候选原则标成 rejected，之后同主题不再晋升。`{ ids, reason? }` |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
 | GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + 当前 `hudIcon` 图标键（卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |

@@ -79,6 +79,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 提炼提示词、模型输出容错、触发条件 | `lib/distill.js` | `lib/index.js` 里的 capture 流程 | `distill` |
 | 全局原则晋升（候选准入 / 分层门槛 / 主题聚类 / 晋升执行） | `lib/distill-global.js` | `lib/index.js` 的 `runGlobalDistill` 与 `maybeDistillGlobally`、`docs/global-distill-trial-2026-11-05.md` | `distill-global` |
 | 全局候选原则池（候选读写与裁决标记） | `lib/store.js` 的 `candidates` | `lib/distill-global.js`、`skills/global-distill/SKILL.md` | `store` + `distill-global` |
+| 交付前自查（发版前的必经步骤） | `skills/delivery-check/SKILL.md` | `skills/release/SKILL.md` 的 0.5 步、`test/run-all.mjs` 与 `tools/doc-numbers.mjs` 的闸门 | `host`（并跑一次 `run-all`） |
 | 文档里的断言总数与套件数校验 | `tools/doc-numbers.mjs` | `test/run-all.mjs` 的收尾段、`test/host.test.mjs` 的两条校验器测试 | `host`（并跑一次 `run-all` 看闸门） |
 | Dream 整理管线（合并重复簇 / 矛盾报告（不自动归档）/ 全局原则晋升判定 / 启动 + 轮末到期检查与台账） | `lib/dream.js` | `lib/index.js` 的 `runAutoDream`、`lib/store.js` 的 `maintenanceState` / `noteMaintenance` / `candidates`、`lib/api.js` 的 `/dream` 与 `/health` | `api` + `activate` + `store` + `distill-global` |
 | 自动刷新全局画像（WorkBuddy 式主路径：turn/end + 会话销毁触发、吸收当前工作区近况） | `lib/index.js` 的 `scheduleAutoPortrait` / `runPortraitRewrite` | `lib/portrait.js`、`lib/client.js` 画像卡自动状态、`lib/api.js` 的 `/portrait` 与 `/health` | `activate` + `portrait` + `api` |
@@ -149,6 +150,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 正式发版、打 `v*` 标签、核对 Release | `skills/release/SKILL.md` |
 | 更新文件 / 更新文档 / 更新日志 | `skills/docs-sync/SKILL.md` |
 | 更新项目记忆 `.dsh-memory/MEMORY.md`：结构、写作规范、离线交接 | `skills/memory-doc/SKILL.md` |
+| 交付前自查：发版前必做，测试绿了也要查交付物与文档 | `skills/delivery-check/SKILL.md` |
 | 从项目记忆提炼跨项目原则（二级蒸馏） | `skills/global-distill/SKILL.md` |
 | 新增项目级 skill 的目录与 frontmatter 约定 | `skills/README.md` |
 
