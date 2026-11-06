@@ -1,6 +1,6 @@
 {
   "name": "@bangbang-03/dsh-memory",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "DSH 工作区记忆画像：有证据、有版本、能解释变化；索引简报省 token、轮末本地召回、红线 / 审批队列 / 版本链 / 注入审计；零依赖、不出站。",
   "keywords": [
     "dsh",

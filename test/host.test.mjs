@@ -119,6 +119,24 @@ check('文档数字校验器：徽章 / 断言 / 套件明细三种写法都能�
   assert.equal(bad.length, 3, '三种写法各报一次，不能合并成一条也不能漏');
 });
 
+check('文档数字校验器：端点数按 api.js 实际路由算，不靠人肉数', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-docnum3-'));
+  fs.mkdirSync(path.join(dir, 'lib'), { recursive: true });
+  /* 两种 key 形态都要数到：普通与 async 前缀。 */
+  fs.writeFileSync(
+    path.join(dir, 'lib/api.js'),
+    ["    'GET /ping'({}) {", "    async 'POST /dream'({}) {"].join('\n'),
+    'utf8',
+  );
+  fs.writeFileSync(path.join(dir, 'doc.md'), 'HTTP 契约：2 个端点。', 'utf8');
+  assert.deepEqual(verifyDocNumbers(dir, { total: 100, suites: 15, files: ['doc.md'] }), []);
+
+  fs.writeFileSync(path.join(dir, 'doc.md'), 'HTTP 契约：5 个端点。', 'utf8');
+  const problems = verifyDocNumbers(dir, { total: 100, suites: 15, files: ['doc.md'] });
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /端点数.*5.*2/);
+});
+
 check('文档数字校验器：套件数写错也会被抓到', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-docnum2-'));
   fs.writeFileSync(path.join(dir, 'doc.md'), '全部 14 个套件通过，100 条断言。', 'utf8');

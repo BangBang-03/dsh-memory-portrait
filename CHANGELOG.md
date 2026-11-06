@@ -2,6 +2,21 @@
 
 本项目的用户可见变更。格式参考 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循 SemVer；日期用 `Asia/Shanghai`。
 
+## [0.9.1] - 2026-11-06
+
+### Added
+
+- 新增项目级 skill `skills/delivery-check/SKILL.md`：交付前自查。先跑自动化闸门（测试 / 文档数字 / 配置键 / 兼容），再查自动化查不到的——交付物是不是真的更新了、上一次自查之后的所有提交是否都补了文档、文档**描述**是否跟上行为变更、新文件有没有被索引、数量类描述（端点数没有闸门）、红线抽查。核心规则一句话：**自查只对当时的 HEAD 有效**，自查完又提交就得重查。
+- `skills/release/SKILL.md` 把交付自查定为发版前的**必经步骤**（流程 0.5 步 + 「不可违反」第 8 条）。预检确认「能发」，自查确认「该发」。
+- 端点数纳入文档数字闸门：`tools/doc-numbers.mjs` 现在按 `lib/api.js` 的实际路由自动统计并校验文档里的「N 个端点」，不再靠人肉数。
+
+### Fixed
+
+- `tools/README.md` 补登记新工具 `doc-numbers.mjs`。
+- `skills/global-distill/SKILL.md` 的触发条件描述改为「还剩 5 条以上没被提炼过的素材」——此前仍写着已被替换掉的旧判据（「素材比上次多了 5 条」）。skill 是给模型读的操作手册，写错会让它理解错触发条件。
+- `docs/REFERENCE.md` 的「五条记忆通路」实际列了 7 条，且完全没有二级蒸馏这一条：标题不再承诺数量，补上二级蒸馏作为第 5 条通路（编号顺延到 8）。
+- 文档里的端点数从 48 修正为 53。上一版数端点用的 `grep` 漏了 key 带 `async` 前缀的那 5 个（`/capture`、`/distill`、`/dream`、`/portrait/migrate`、`/portrait/rewrite`）；README 的契约表本来就是 53 行，是对的，错的只有 REFERENCE 与测试入口的描述。
+
 ## [0.9.0] - 2026-11-06
 
 ### Added

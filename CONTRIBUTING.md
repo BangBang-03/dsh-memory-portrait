@@ -16,7 +16,7 @@ pwsh -File install.ps1
 - 测试：
 
 ```powershell
-node test/run-all.mjs   # 15 套件 / 651 断言
+node test/run-all.mjs   # 15 套件 / 652 断言
 ```
 
 `install` 套件会真跑 `install.ps1` / `uninstall.ps1`，需要 Windows + `pwsh`；其它套件是纯逻辑层，可以单独跑，例如 `node test/store.test.mjs`。

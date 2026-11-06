@@ -25,5 +25,5 @@
 
 - 改宿主半（`index.js`、`store.js` 等）后要**重启 DSH** 才生效；只改 `client.js` 用 `Ctrl+Shift+R` 硬刷新即可。
 - 哪个模块对应哪个测试套件，见根 [AGENTS.md](../AGENTS.md) 的路由表；改完统一跑 `node test/run-all.mjs`
-  （当前 15 套件 / 651 断言）。
+  （当前 15 套件 / 652 断言）。
 - 配置键、默认值、HTTP 契约的权威说明在根 [README.md](../README.md)，不在本目录。
