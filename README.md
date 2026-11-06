@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![npm](https://img.shields.io/npm/v/@bangbang-03/dsh-memory?color=4d6bfe&label=npm)](https://www.npmjs.com/package/@bangbang-03/dsh-memory)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-648%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-651%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 **DSH 的记忆画像：不是记住更多，而是让你看见它怎么理解你。**<br>
 **Long-term memory for DeepSeek Harness, with a portrait you can inspect.**
@@ -162,7 +162,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | `autoCapture` | `false` | 轮次结束自动提炼 |
 | `autoDreamDays` | `7` | 启动整理：启动时与轮末检查当前（最近使用的）工作区，距上次（自动或手动）整理满 N 天就在后台整理一次；`0` 关闭（0–365）。没有常驻定时器 |
 | `autoDreamPortrait` | `false` | 自动整理（启动时）是否顺带重写画像；默认关——画像由 `autoPortraitHours` 自动刷新负责。手动 Dream 仍会刷新一版进待审 |
-| `globalDistill` | `true` | 二级蒸馏：把本项目记忆抽成「候选原则」写进全局候选池。**时机由模型决定**（`memory` 工具的 `distill-global` 动作，在一段工作告一段落时显式调用）；兜底是轮末——可蒸馏素材比上次多了 5 条就自动提炼一次。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
+| `globalDistill` | `true` | 二级蒸馏：把本项目记忆抽成「候选原则」写进全局候选池。**时机由模型决定**（`memory` 工具的 `distill-global` 动作，在一段工作告一段落时显式调用）；兜底是轮末——还剩 5 条以上**没被提炼过**的素材时自动提炼一次（按候选原则的 `anchors` 判断覆盖，不看时间）。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
 | `autoPortraitHours` | `6` | 自动刷新全局画像：每 N 小时检查一次，有新素材时调用模型重写；`0` 关闭（0–168）。面板「立即刷新」只是兜底 |
 | `captureMode` | `"direct"` | `direct` 直接落库；`draft` 先进待审队列 |
 | `staleDays` | `60` | 体检里「过期未用」的判定天数 |
@@ -271,7 +271,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 ## 测试
 
 ```powershell
-npm test   # 15 个套件 / 648 项断言
+npm test   # 15 个套件 / 651 项断言
 ```
 
 - 检索：54 条记忆 × 60 条查询硬评测，Recall@5 1.000、MRR@10 0.930（自测口径，见 [评测说明](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/retrieval-eval-2026-10-20.md)）。

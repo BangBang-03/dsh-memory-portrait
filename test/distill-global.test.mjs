@@ -215,6 +215,28 @@ test('端到端：第二个项目出现同主题后，decision 也能晋升', ()
   assert.ok(promoted.some((item) => item.category === 'decision'));
 });
 
+/* ---------------- 素材覆盖：决定「还要不要提炼」 ---------------- */
+
+const { uncoveredMaterials } = mod;
+
+test('素材覆盖：没有候选时，全部素材都算未提炼', () => {
+  const materials = [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }];
+  assert.equal(uncoveredMaterials(materials, [], 'ws-a').length, 3);
+});
+
+test('素材覆盖：被候选 anchors 引用过的就不再算新素材', () => {
+  const materials = [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }, { id: 'm4' }];
+  const candidates = [{ project: 'ws-a', anchors: ['m1', 'm2'], text: 'x' }];
+  const fresh = uncoveredMaterials(materials, candidates, 'ws-a');
+  assert.deepEqual(fresh.map((m) => m.id), ['m3', 'm4']);
+});
+
+test('素材覆盖：别的项目的候选不算覆盖（各项目独立提炼）', () => {
+  const materials = [{ id: 'm1' }, { id: 'm2' }];
+  const candidates = [{ project: 'ws-b', anchors: ['m1'], text: 'x' }];
+  assert.equal(uncoveredMaterials(materials, candidates, 'ws-a').length, 2);
+});
+
 /* ---------------- 模型输出解析 ---------------- */
 
 const { GLOBAL_DISTILL_SYSTEM, parseGlobalDistill } = mod;
