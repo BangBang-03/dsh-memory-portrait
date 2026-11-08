@@ -75,6 +75,28 @@ return { ...decision, messages: entering.toSpliced(anchor + 1, 0, message) };
 - `turnRecall` / `turnRecallLimit` 设置照旧生效（`recallFor()` 里读设置）。
 - 注入计量写进 `lastTail`，通过 `/memory/api/state` 的 `briefing.tail` 暴露。
 
+### 2.4 重算闸：内容变了也不一定立刻重算（2026-11-08）
+
+指纹只解决「纯读不变」，解决不了「写一条就变一次」。DSH 的 `in-history` 契约是
+**把整份系统提示追加到缓存历史之后**（见 §3.1），所以每次重算的代价不是改一段，
+而是历史里永久多一份 ~10KB 的提示。实测：4 轮 / 273 步的会话出现 6 份系统提示
+（多出 51K 字符，约占该会话 61.5M tokens 的 3.8%）；29 轮 / 485 步的会话出现 28 份。
+
+现在的策略（`lib/index.js` 的 `briefingTextCore`）：
+
+- 指纹变了以后先看两道闸，都没过就继续返回冻结字节，`lastBriefing.reason = 'coalesced'`，
+  `pendingNew` / `waitedMs` 进 `/state` 方便面板解释「为什么还没刷新」；
+- 闸一：自上次重算以来**新增记录数** ≥ `briefingRebuildMinNew`（默认 3）；
+- 闸二：距上次重算 ≥ `briefingRebuildCooldownMs`（默认 10 分钟），兜住编辑 / 归档 /
+  画像版本 / 工作日志这类不新增 id 的变化；
+- 首次装配、工作区切换、模式切换、会话 id 复用照旧立即重算；
+- 红线是安全边界：新增 / 改稿 / 归档绕过两道闸，立刻重算；
+- `1` / `0` 等同旧行为（写一条就重算），需要「新记忆立刻可见」的用户可以调回去。
+
+代价与取舍：最多约 10 分钟 / 3 条之内，新写的记忆与改稿不会出现在下一次请求的索引里
+（红线除外）；正文仍可用 `memory action=search/get` 取到。简报正文同时去掉了工作区统计行
+（条数会随单条写入立刻变，是重算的稳定触发器）。
+
 ## 3. 尾部注入的宿主契约（证据）
 
 源码都在 `D:\DSH\resources\app.asar`（0.2.1-rc.2）。抽取方式：

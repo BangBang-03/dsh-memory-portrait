@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![npm](https://img.shields.io/npm/v/@bangbang-03/dsh-memory?color=4d6bfe&label=npm)](https://www.npmjs.com/package/@bangbang-03/dsh-memory)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-652%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-673%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 **DSH 的记忆画像：不是记住更多，而是让你看见它怎么理解你。**<br>
 **Long-term memory for DeepSeek Harness, with a portrait you can inspect.**
@@ -98,7 +98,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | 轮末召回 | `turn/end` | 当轮用户消息本地检索，命中项下一轮尾部注入；纯本地 0 token |
 | 路径 JIT | 工具触达 `files` | 相关记忆在下一步尾部注入；全路径 > 目录后缀 > 同名 |
 | 自动提炼 | 轮次结束（可选） | 结构化记忆；`captureMode: draft` 先进审批队列 |
-| 二级蒸馏 | 模型判断，或素材攒够 5 条 | 把本项目的教训抽成**跨项目**原则：`constraint` / `feedback` / `preference` 是用户亲口说的，单项目即可晋升；`decision` / `convention` 是推断出来的，要第二个项目交叉验证。够格的自动升为全局记忆，维护页可看、可「不再提议」 |
+| 二级蒸馏 | 模型判断；素材攒够 3 条（用户亲口说的 2 条即可） | 把本项目的教训抽成**跨项目**原则：`constraint` / `feedback` / `preference` 是用户亲口说的，单项目即可晋升；`decision` / `convention` 是推断出来的，要第二个项目交叉验证。够格的自动升为全局记忆。节奏自适应：连续空跑 15m → 30m → 1h … 最多 24h；重复表述（候选池里已有）也算没有进展，不会每 15 分钟重跑；维护页能看上次素材数、解析数、拒绝原因与下次窗口 |
 | Dream / 画像 | 启动 + 轮末到期检查 | 合并重复簇、报告矛盾、报告过期、全局原则晋升判定；画像按 6 小时自动刷新 |
 | 前台会话卡 | 仅当前对话（可收起） | 右下角悬浮卡：图标 + 「更新于 YYYY-MM-DD HH:MM」+ 一段话摘要（本会话沉淀的记忆标题连成一句，草稿不可见）；图标在设置里可选 7 种，默认官方鲸鱼标；可拖拽，位置本地记住；切到设置 / 插件 / 自动化任务页自动隐藏，切对话自动换摘要；设置 → 记忆可用「该对话记忆」单独关闭本对话 |
 
@@ -150,6 +150,8 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | `briefMode` | `"index"` | `index` 一行一条索引（省 token）；`full` 标题+正文摘录；`portrait` 全局画像全量（工作区画像已撤）+ 索引清单 |
 | `briefingLimit` | `12` | 注入条数上限（1–50） |
 | `briefingMaxChars` | `2000` | 注入字数上限（200–20000） |
+| `briefingRebuildMinNew` | `3` | 简报重算闸：同一会话内新增记录攒够几条才重算系统提示（1–50；`1` = 写一条就重算）。每次重算都会让宿主把整份系统提示再追加进历史，调大更省 token，调小更新更及时 |
+| `briefingRebuildCooldownMs` | `600000` | 简报重算闸（时间）：没攒够条数时，距上次重算满多少毫秒也重算一次，兜住编辑 / 归档 / 画像 / 日志这类不新增条目的变化（0–3600000；`0` = 有变化就重算） |
 | `portraitMaxChars` | `1400` | 画像注入的字数预算（工作区 + 全局合计；仅 `briefMode=portrait` 生效，200–8000） |
 | `discipline` | `true` | 注入「记忆纪律」一段（何时写什么、对话内指令触发规则） |
 | `rewriteMode` | `"direct"` | 画像重写写入方式：`direct` 直接落库；`draft` 先存待审稿，面板批准后才生效 |
@@ -159,10 +161,16 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | `turnRecallMaxChars` | `800` | 轮末召回块总字符上限（200–4000），超出的条目不注入 |
 | `sectionOrder` | `550` | 注入段落在系统提示里的位置 |
 | `hudIcon` | `"a"` | 前台会话卡图标：`a` 官方鲸鱼标（默认）/ `b` 官方 App 图标 / `c` 可爱鲸鱼 / `d` 深蓝鲸鱼 / `e`–`g` 鲸鱼娘二创位图。二创图标为公开页面素材、作者未署名，对外分发前需确认授权 |
+| `hudWidth` | `340` | 前台会话卡宽度（px，240–640）；设置页滑杆或卡片右下角拖拽调整 |
+| `hudHeight` | `0` | 前台会话卡高度（px，0 = 随内容自适应；固定值 180–720，正文区内部滚动） |
+| `hudOpacity` | `1` | 前台会话卡背景不透明度（0.35–1）。只混底色，文字保持清晰；不支持 `color-mix` 的宿主退回不透明底 |
+| `hudColor` | `""` | 前台会话卡背景色（`#rgb` / `#rrggbb`）；空 = 跟随宿主主题。自定义底色时文字按亮度自动换成深色或浅色 |
 | `autoCapture` | `false` | 轮次结束自动提炼 |
 | `autoDreamDays` | `7` | 启动整理：启动时与轮末检查当前（最近使用的）工作区，距上次（自动或手动）整理满 N 天就在后台整理一次；`0` 关闭（0–365）。没有常驻定时器 |
 | `autoDreamPortrait` | `false` | 自动整理（启动时）是否顺带重写画像；默认关——画像由 `autoPortraitHours` 自动刷新负责。手动 Dream 仍会刷新一版进待审 |
-| `globalDistill` | `true` | 二级蒸馏：把本项目记忆抽成「候选原则」写进全局候选池。**时机由模型决定**（`memory` 工具的 `distill-global` 动作，在一段工作告一段落时显式调用）；兜底是轮末——还剩 5 条以上**没被提炼过**的素材时自动提炼一次（按候选原则的 `anchors` 判断覆盖，不看时间）。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
+| `globalDistill` | `true` | 二级蒸馏：把本项目记忆抽成「候选原则」写进全局候选池。**时机由模型决定**（`memory` 工具的 `distill-global` 动作，在一段工作告一段落时显式调用）；兜底是轮末——按候选原则的 `anchors` 判断「还有几条没提炼过」，再用下两行的自适应间隔控制频次。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
+| `globalDistillMinNew` | `3` | 二级蒸馏的素材门槛：还剩多少条**没被提炼过**的素材才值得再试一次。`feedback` / `constraint` / `preference` 未覆盖达到 2 条时也会触发——这几类单项目就能晋升，优先蒸馏 |
+| `globalDistillCooldownMinutes` | `15` | 二级蒸馏的基础间隔（分钟）。连续空跑按 2 倍指数退避（15m → 30m → 1h … 上限 24h），有产出就回到基础间隔；不是定时任务，素材门槛没过时连时间闸都不看 |
 | `autoPortraitHours` | `6` | 自动刷新全局画像：每 N 小时检查一次，有新素材时调用模型重写；`0` 关闭（0–168）。面板「立即刷新」只是兜底 |
 | `captureMode` | `"direct"` | `direct` 直接落库；`draft` 先进待审队列 |
 | `staleDays` | `60` | 体检里「过期未用」的判定天数 |
@@ -191,6 +199,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/state` | 版本、工作区、统计、设置、类别、工作区列表、标签、最近提炼、最近简报计量 |
+| GET | `/overview` | 面板「记忆概览」的聚合数据：项目 / 全局 / 待审 / 红线计数、类别分布、近 7 天新增（按 `createdAt`）、全局画像覆盖率；只读，不拉明细 |
 | GET | `/briefing-preview` | 简报预览：按当前设置算「下次会话会注入哪些记忆」，含画像计量与预算挤掉的条目 |
 | GET | `/list` | 列表；`q/category/scope/tag/archived/sort/limit/offset`（不含草稿） |
 | GET | `/record` | 读单条（含归档，不含草稿）：`id`；画像依据下钻用 |
@@ -203,7 +212,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | GET | `/redline/history` | 红线当前版本 + 旧版本列表 |
 | POST | `/redline/rollback` | 红线回滚（必须 `confirm: true`；当前版本先写回历史） |
 | POST | `/settings` | 写设置 |
-| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态）与 `candidates` / `candidateItems`（二级蒸馏候选池：待判定计数与明细，供维护页渲染） |
+| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态）、`candidates` / `candidateItems`（二级蒸馏候选池：待判定计数与明细，供维护页渲染）与 `globalDistill`（上次二级蒸馏：素材 / 解析 / 拒绝原因 / 脱敏摘要 / 自适应节奏与下次允许时间） |
 | POST | `/health/resolve` | 一键处理：`merge`（合并簇，可带 `title/category/tags/content` 覆盖合并稿；红线与矛盾对会被拒绝）/ `time-order`（对一对矛盾按时序归档旧条，红线 / 置顶 / 用户旧条 / 外部新条会被拒绝）/ `archive`（归档过期）/ `unlink`（摘除断链） |
 | GET | `/timeline` | 全部记忆（含归档、不含草稿）按更新时间倒序 |
 | GET | `/portrait` | 当前画像（工作区 + 全局）、版本列表、段落定义 |
@@ -231,7 +240,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用 + 二级蒸馏与全局原则晋升 + 画像重写进待审 |
 | POST | `/candidates/reject` | 「不再提议」：把候选原则标成 rejected，之后同主题不再晋升。`{ ids, reason? }`。自动路径不弹确认，纠错就靠这一个动作 |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
-| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + 当前 `hudIcon` 图标键（卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
+| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + `hudIcon` 图标键 + `hud` 外观（`width` / `height` / `opacity` / `color`；卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
 | GET | `/injections` | 注入审计：最近真正进 prompt 的内容（正文预览 + sha256 前 16 位 + id 列表 + 被挤掉的条目；`full=1` 给原文，`kind` 可过滤） |
 | GET | `/derivations` | 跨层派生链：每层派生了什么、源现在还成不成立（`state` 为 `fresh` / `dirty`，带失效原因） |
 | GET | `/reviews` | 复审队列：带失效条件、到期该复查的记忆（`due` / `soon`） |
@@ -255,6 +264,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
   workspaces/<目录名>-<hash>/portrait.json    工作区画像
   workspaces/<目录名>-<hash>/derivations.json 跨层派生链
   workspaces/<目录名>-<hash>/journal/         每天一个只追加的工作日志
+  workspaces/<目录名>-<hash>/global-distill.json 二级蒸馏台账（素材 / 拒绝原因 / 空跑次数）
   workspaces/_global/memories.json            跨工作区共享的全局记忆
   workspaces/_global/candidates.json          二级蒸馏的候选原则池（等跨项目共振）
   backups/<时间戳>-<原因>/                     整库快照（每天一次 + 每次 Dream 前）
@@ -271,7 +281,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 ## 测试
 
 ```powershell
-npm test   # 15 个套件 / 652 项断言
+npm test   # 15 个套件 / 673 项断言
 ```
 
 - 检索：54 条记忆 × 60 条查询硬评测，Recall@5 1.000、MRR@10 0.930（自测口径，见 [评测说明](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/retrieval-eval-2026-10-20.md)）。

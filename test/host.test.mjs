@@ -46,6 +46,8 @@ check('Config 解析空对象得到默认值', () => {
   assert.equal(value.briefing, true);
   assert.equal(value.briefingLimit, 12);
   assert.equal(value.briefingMaxChars, 2000);
+  assert.equal(value.briefingRebuildMinNew, 3, '简报重算闸默认攒 3 条新记录');
+  assert.equal(value.briefingRebuildCooldownMs, 600000, '简报重算闸默认 10 分钟');
   assert.equal(value.portraitMaxChars, 1400);
   assert.equal(value.discipline, true);
   assert.equal(value.rewriteMode, 'direct');
@@ -64,9 +66,15 @@ check('Config 解析空对象得到默认值', () => {
   assert.equal(value.autoDreamDays, 7, '启动整理默认每 7 天一次');
   assert.equal(value.autoDreamPortrait, false, '启动整理默认不重写画像（画像由自动刷新负责）');
   assert.equal(value.globalDistill, true, '二级蒸馏默认开：自动为主，不靠用户点确认');
+  assert.equal(value.globalDistillMinNew, 3, '二级蒸馏素材门槛默认 3 条');
+  assert.equal(value.globalDistillCooldownMinutes, 15, '二级蒸馏基础间隔默认 15 分钟');
   assert.equal(value.autoPortraitHours, 6, '画像默认每 6 小时自动刷新');
   assert.equal(value.sectionOrder, 550);
   assert.equal(value.hudIcon, 'a', '会话卡图标默认官方鲸鱼标');
+  assert.equal(value.hudWidth, 340, '会话卡默认宽度 340');
+  assert.equal(value.hudHeight, 0, '会话卡高度默认随内容自适应');
+  assert.equal(value.hudOpacity, 1, '会话卡背景默认不透明');
+  assert.equal(value.hudColor, '', '会话卡默认跟随主题');
   assert.equal(value.directory, '');
   assert.equal(value.autoInject, true, '注入总闸默认开');
   assert.deepEqual(value.disabledWorkspaces, [], '停用名单默认空');
@@ -167,16 +175,26 @@ check('续跑判定：没有新信息的确认句跳过召回，短指令照常�
 });
 
 check('Config 接受覆盖值', () => {
-  const value = mod.Config({ enabled: false, autoCapture: true, briefingLimit: 5, falsifierReviewDays: 30 });
+  const value = mod.Config({
+    enabled: false,
+    autoCapture: true,
+    briefingLimit: 5,
+    falsifierReviewDays: 30,
+    briefingRebuildMinNew: 1,
+    briefingRebuildCooldownMs: 0,
+  });
   assert.equal(value.enabled, false);
   assert.equal(value.autoCapture, true);
   assert.equal(value.briefingLimit, 5);
   assert.equal(value.falsifierReviewDays, 30);
+  assert.equal(value.briefingRebuildMinNew, 1, '1 = 恢复「写一条就重算」');
+  assert.equal(value.briefingRebuildCooldownMs, 0, '0 = 有变化就重算');
 });
 
 check('Config 拒绝越界值', () => {
   assert.throws(() => mod.Config({ briefingLimit: 999 }));
   assert.throws(() => mod.Config({ minConfidence: 5 }));
+  assert.throws(() => mod.Config({ briefingRebuildMinNew: 0 }), '重算闸条数至少 1');
 });
 
 check('API_PREFIX 常量正确', () => assert.equal(mod.API_PREFIX, '/memory/api'));

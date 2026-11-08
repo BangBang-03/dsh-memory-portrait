@@ -219,12 +219,20 @@ const workspace = path.join(tmp, 'workspace');
 fs.mkdirSync(workspace, { recursive: true });
 
 /** 每项测试都拿一份干净的插件实例（自己的数据目录 + 自己的假 ctx）。 */
-function activate({ services = {}, ...config } = {}) {
+function activate({ services = {}, briefingRebuildMinNew = 1, briefingRebuildCooldownMs = 0, ...config } = {}) {
   const dir = fs.mkdtempSync(path.join(tmp, 'data-'));
   const { ctx, calls } = createFakeCtx(services);
   // 启动整理 / 自动刷新画像默认关：这些用例测的是其它路径，不让后台整理在断言之间插进来。
   // 专项用例会显式传 autoDreamDays / autoPortraitHours 打开。
-  mod.apply(ctx, { directory: dir, autoDreamDays: 0, autoPortraitHours: 0, ...config });
+  // 简报重算闸默认关（1 条 / 0ms）：本套用例写一条就断言可见；闸本身由 briefing-stability 验证。
+  mod.apply(ctx, {
+    directory: dir,
+    autoDreamDays: 0,
+    autoPortraitHours: 0,
+    briefingRebuildMinNew,
+    briefingRebuildCooldownMs,
+    ...config,
+  });
   const tool = calls.tools[0];
   const route = calls.routes[0]?.handler;
   const messages = [
@@ -1768,6 +1776,79 @@ await test('画像重写 direct：落库版本 +1，提示词里带日志原料'
   assert.match(prompt, /重写原料日志。/, '提示词应包含日志原料');
 });
 
+await test('画像重写：没有会话请求头时回落到宿主默认模型', async () => {
+  const seen = [];
+  const { calls, route } = activate({
+    services: {
+      llm: fakeLlm(REWRITE_REPLY, seen),
+      agentDefaultModel: {
+        currentSelection: () => ({ provider: 'deepseek-account', model: 'deepseek-pro' }),
+      },
+    },
+  });
+  /* 会话登记过工作区、但还没产生任何请求头：模拟宿主刚启动、面板直接点「重写」。
+     此时路由链的前三级全空，只能靠宿主的默认模型。 */
+  const bare = {
+    id: 'session-bare-1',
+    header: { cwd: workspace },
+    requestHeader: () => ({}),
+  };
+  calls.events.find(([name]) => name === 'session/created')[1](bare);
+  await callRoute(route, {
+    method: 'POST',
+    url: '/memory/api/save',
+    body: JSON.stringify({
+      workspace,
+      title: '默认模型回落的原料',
+      content: '这条正文足够长，不会被质量闸门归档，也不会被当成元记忆。',
+      category: 'fact',
+      source: 'manual',
+    }),
+  });
+
+  const res = await callRoute(route, {
+    method: 'POST',
+    url: '/memory/api/portrait/rewrite',
+    body: JSON.stringify({ workspace, scope: 'workspace' }),
+  });
+  assert.equal(res.status, 200, `应回落到默认模型，实际：${JSON.stringify(res.body)}`);
+  assert.equal(seen.at(-1)?.provider, 'deepseek-account');
+  assert.equal(seen.at(-1)?.model, 'deepseek-pro');
+});
+
+await test('画像重写：连默认模型都没有时，错误明细是一句可操作的话', async () => {
+  const seen = [];
+  const { calls, route } = activate({ services: { llm: fakeLlm(REWRITE_REPLY, seen) } });
+  const bare = {
+    id: 'session-bare-2',
+    header: { cwd: workspace },
+    requestHeader: () => ({}),
+  };
+  calls.events.find(([name]) => name === 'session/created')[1](bare);
+  await callRoute(route, {
+    method: 'POST',
+    url: '/memory/api/save',
+    body: JSON.stringify({
+      workspace,
+      title: '空路由的原料',
+      content: '这条正文足够长，不会被质量闸门归档，也不会被当成元记忆。',
+      category: 'fact',
+      source: 'manual',
+    }),
+  });
+
+  const res = await callRoute(route, {
+    method: 'POST',
+    url: '/memory/api/portrait/rewrite',
+    body: JSON.stringify({ workspace, scope: 'workspace' }),
+  });
+  assert.equal(res.status, 500);
+  assert.equal(res.body.error, 'no_model_route');
+  assert.equal(typeof res.body.detail, 'string', 'detail 必须是字符串，面板才能直接展示');
+  assert.match(res.body.detail, /模型/);
+  assert.equal(seen.length, 0, '没有路由时不应该调用模型');
+});
+
 await test('画像重写（全局）：原料里要带得上全局条目，不只是日志', async () => {
   const seen = [];
   const { calls, route, session, tool, exec } = activate({ services: { llm: fakeLlm(REWRITE_REPLY, seen) } });
@@ -2042,7 +2123,7 @@ await test('二级蒸馏：distill-global 动作是模型自己的时机入口�
       anchors: ['m1', 'm2'],
     },
   ]);
-  const { tool, exec, session, calls } = activate({ services: { llm: seqLlm([reply]) } });
+  const { tool, exec, session, calls, route } = activate({ services: { llm: seqLlm([reply]) } });
   calls.events.find(([name]) => name === 'session/created')[1](session);
 
   await tool.execute(
@@ -2062,6 +2143,157 @@ await test('二级蒸馏：distill-global 动作是模型自己的时机入口�
   assert.equal(result.count, 1, '应提炼出 1 条候选原则');
   assert.match(result.text, /提炼出 1 条候选原则/);
   assert.match(result.text, /本次晋升 1 条全局记忆/, 'feedback 是用户亲口说的，单项目就该晋升');
+
+  const health = await callRoute(route, {
+    url: `/memory/api/health?workspace=${encodeURIComponent(workspace)}`,
+  });
+  const info = health.body.health.globalDistill;
+  assert.equal(info.lastResult, 'added', '成功也要落台账');
+  assert.equal(info.lastAdded, 1);
+  assert.equal(info.emptyStreak, 0, '有产出应把空跑计数清零');
+});
+
+await test('二级蒸馏：重复表述不新增候选时，不把连续空跑计数清零', async () => {
+  const reply = JSON.stringify([
+    {
+      text: '对外素材一律使用构造数据并标注来源',
+      category: 'feedback',
+      topics: ['privacy'],
+      anchors: ['m1', 'm2'],
+    },
+  ]);
+  const { tool, exec, session, calls, route } = activate({ services: { llm: seqLlm([reply]) } });
+  calls.events.find(([name]) => name === 'session/created')[1](session);
+  const materials = [
+    ['用户拒绝真实数据截图', '不要用真实数据截图，文档与演示一律使用构造数据并标注来源。', 'feedback'],
+    ['失败方案要公平复测', '已判负的路线不要一句话拒绝，换新口径公平复测后再下结论。', 'feedback'],
+    ['结论必须自测', '审查结论必须自己重跑代码与数据给出数字，不复述文档里的说法。', 'decision'],
+  ];
+  for (const [title, content, category] of materials) {
+    await tool.execute({ action: 'save', title, content, category }, exec);
+  }
+
+  const first = await tool.execute({ action: 'distill-global' }, exec);
+  assert.equal(first.count, 1, '第一次应新增候选');
+  const second = await tool.execute({ action: 'distill-global' }, exec);
+  assert.equal(second.count, 0);
+  assert.match(second.text, /没有新的候选原则/);
+  assert.match(second.text, /重复跳过 1 条/);
+
+  const health = await callRoute(route, {
+    url: `/memory/api/health?workspace=${encodeURIComponent(workspace)}`,
+  });
+  const info = health.body.health.globalDistill;
+  assert.equal(info.lastResult, 'duplicate');
+  assert.equal(info.emptyStreak, 1, '没有新增 = 没有进展，应进入退避');
+  assert.equal(info.intervalMinutes, 30, '空跑一次后间隔翻倍到 30 分钟');
+});
+
+await test('轮末自动二级蒸馏：素材攒够后自动跑一次并落候选池', async () => {
+  const captureReply = JSON.stringify([
+    { title: '自动蒸馏素材甲', content: '用户纠正了甲行为，要求先验证再下结论。', category: 'feedback', tags: [], confidence: 0.9 },
+    { title: '自动蒸馏素材乙', content: '用户纠正了乙行为，要求先备份再动手。', category: 'feedback', tags: [], confidence: 0.9 },
+    { title: '自动蒸馏素材丙', content: '用户纠正了丙行为，要求后台任务失败要冷却。', category: 'feedback', tags: [], confidence: 0.9 },
+  ]);
+  const globalReply = JSON.stringify([
+    {
+      text: '改动前先备份并验证，再下结论',
+      category: 'feedback',
+      topics: ['backup', 'verification'],
+      anchors: ['m1'],
+    },
+  ]);
+  const { calls, route, session } = activate({
+    services: { llm: seqLlm([captureReply, globalReply]) },
+    autoCapture: true,
+    captureCooldownMs: 0,
+    autoCaptureMinChars: 100,
+  });
+  const onEvent = calls.events.find(([name]) => name === 'session/event')[1];
+  onEvent(session, { type: 'turn/end' });
+
+  const q = `?workspace=${encodeURIComponent(workspace)}`;
+  const done = await waitFor(async () => {
+    const health = await callRoute(route, { url: `/memory/api/health${q}` });
+    return health.body.health.globalDistill.lastResult === 'added';
+  });
+  assert.ok(done, '轮末应自动跑一次二级蒸馏并落候选');
+
+  const health = await callRoute(route, { url: `/memory/api/health${q}` });
+  const info = health.body.health.globalDistill;
+  assert.ok(info.lastMaterials >= 3, '应带上刚提炼出的 3 条素材');
+  assert.ok(
+    (health.body.health.candidates?.pending ?? 0) + (health.body.health.candidates?.promoted ?? 0) >= 1,
+    '候选应进池（或已当场晋升）',
+  );
+});
+
+await test('二级蒸馏：空产出时把原因写进台账，面板能看出是「模型回空」', async () => {
+  const { tool, exec, session, calls, route, dir } = activate({ services: { llm: seqLlm(['[]']) } });
+  calls.events.find(([name]) => name === 'session/created')[1](session);
+  const materials = [
+    ['用户拒绝真实数据截图', '不要用真实数据截图，文档与演示一律使用构造数据并标注来源。', 'feedback'],
+    ['失败方案要公平复测', '已判负的路线不要一句话拒绝，换新口径公平复测后再下结论。', 'feedback'],
+    ['结论必须自测', '审查结论必须自己重跑代码与数据给出数字，不复述文档里的说法。', 'decision'],
+  ];
+  for (const [title, content, category] of materials) {
+    await tool.execute({ action: 'save', title, content, category }, exec);
+  }
+
+  const result = await tool.execute({ action: 'distill-global' }, exec);
+  assert.equal(result.count, 0);
+  assert.match(result.text, /没有给出合格原则/);
+  assert.match(result.text, /empty/, '应说明是模型回了空数组');
+
+  const health = await callRoute(route, {
+    url: `/memory/api/health?workspace=${encodeURIComponent(workspace)}`,
+  });
+  const info = health.body.health.globalDistill;
+  assert.equal(info.lastResult, 'no_candidate');
+  assert.equal(info.lastReason, 'empty');
+  assert.equal(info.lastMaterials, 3);
+  assert.equal(info.lastParsed, 0);
+  assert.equal(info.lastAdded, 0);
+  assert.equal(info.attempts, 1);
+  assert.equal(info.emptyStreak, 1, '空跑要累加，供指数退避用');
+
+  const folders = fs.readdirSync(path.join(dir, 'workspaces')).filter((name) => name !== '_global');
+  assert.ok(
+    fs.existsSync(path.join(dir, 'workspaces', folders[0], 'global-distill.json')),
+    '台账应落盘（宿主重启后仍能显示）',
+  );
+});
+
+await test('二级蒸馏：候选全被准入挡掉时，台账记下拒绝原因与原文', async () => {
+  const reply = JSON.stringify([
+    { text: '这条 decision 只有一个锚点会被挡掉', category: 'decision', topics: ['d'], anchors: ['m1'] },
+    { text: '这条没有主题词的原则也会被挡掉', category: 'feedback', topics: [], anchors: ['m2'] },
+  ]);
+  const { tool, exec, session, calls, route } = activate({ services: { llm: seqLlm([reply]) } });
+  calls.events.find(([name]) => name === 'session/created')[1](session);
+  const materials = [
+    ['用户拒绝真实数据截图', '不要用真实数据截图，文档与演示一律使用构造数据并标注来源。', 'feedback'],
+    ['失败方案要公平复测', '已判负的路线不要一句话拒绝，换新口径公平复测后再下结论。', 'feedback'],
+    ['结论必须自测', '审查结论必须自己重跑代码与数据给出数字，不复述文档里的说法。', 'decision'],
+  ];
+  for (const [title, content, category] of materials) {
+    await tool.execute({ action: 'save', title, content, category }, exec);
+  }
+
+  const result = await tool.execute({ action: 'distill-global' }, exec);
+  assert.match(result.text, /all_rejected/, '应说明是候选被准入挡掉，而不是模型回空');
+  assert.match(result.text, /few-anchors×1/);
+  assert.match(result.text, /no-topics×1/);
+
+  const health = await callRoute(route, {
+    url: `/memory/api/health?workspace=${encodeURIComponent(workspace)}`,
+  });
+  const info = health.body.health.globalDistill;
+  assert.equal(info.lastReason, 'all_rejected');
+  assert.equal(info.lastParsed, 2);
+  assert.equal(info.lastRejects['few-anchors'], 1);
+  assert.equal(info.lastRejects['no-topics'], 1);
+  assert.match(info.lastExcerpt, /decision 只有一个锚点/, '空产出要留脱敏摘要供排查');
 });
 
 await test('二级蒸馏：整理不再顺带蒸馏——时机交给模型与轮末，不是定时任务', async () => {

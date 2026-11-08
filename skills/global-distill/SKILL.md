@@ -116,7 +116,7 @@ verification / non-blocking）。不要用项目名、技术栈名、产品名�
 **人工复核**：
 
 - [ ] topics 里没有项目名 / 技术栈名（否则跨项目永远对不上）
-- [ ] anchors 里的 id 真实存在，且至少一条是 `feedback` 或 `decision`
+- [ ] anchors 里的 id 真实存在；`constraint` / `feedback` 至少 1 条，`preference` / `decision` 至少 2 条，`convention` 至少 2 条（晋升时还要跨项目合计 3 条）
 - [ ] 「换一个项目还成立吗」这个问题，答案是肯定的
 - [ ] 条数不超过 3，且没有一条是「因为写得很顺所以留着」
 
@@ -124,7 +124,10 @@ verification / non-blocking）。不要用项目名、技术栈名、产品名�
 
 **什么时候提炼由模型自己判断**，不是定时任务：在工具里调 `memory` 的 `distill-global` 动作
 （那段工作告一段落、或者好几条记忆指向同一条通用原则时），或用本 skill 手工跑一次。
-兜底是轮末——还剩 5 条以上**没被提炼过**的素材时自动提炼一次（按候选的 `anchors` 判断哪条素材已经用过，不看时间、也不看「比上次多了几条」）。
+兜底是轮末——按 `globalDistillMinNew`（默认 3 条）检查还剩几条**没被提炼过**的素材
+（按候选的 `anchors` 判断哪条用过）；`feedback` / `constraint` / `preference` 未覆盖达到 2 条时提前触发。
+时间闸自适应：基础 `globalDistillCooldownMinutes`（默认 15 分钟），连续空跑按 2 倍退避到 24 小时，有产出清零。
+每次尝试都落 `<ws>/global-distill.json`，`/health` 的 `globalDistill` 与维护页能看到素材 / 解析 / 拒绝原因。
 
 候选原则写入全局候选池，格式 `{ text, category, topics, anchors, project, at }`，
 由 `promotionReport()` 聚类后交给 `PROMOTION_RULES` 判定：

@@ -11,7 +11,7 @@
 
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-652%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-673%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 DSH 的**工作区长期记忆**插件。对标 Qoder / WorkBuddy / ZCode 的记忆交互：记忆以当前工作区为单位落库，
 会话开始时把最重要的几条以**索引**形式注入系统提示（一行一条，正文按需用 `memory` 工具取，省 token），
@@ -53,7 +53,7 @@ pwsh -File install.ps1 -FromUrl https://github.com/BangBang-03/dsh-memory-portra
 市场元数据在 `package.json` 的 `dsh.marketplace` / `dsh.permissions`：声明 web / desktop、安装后需重启、桌面端有手动步骤；权限为本地读写、无外发网络、仅调用本地 `git` 做工作区身份识别。兼容口径用 `node tools/check-compat.mjs [--npm]` 核对 README、`package.json` 与 npmjs 已发布清单。headless / TUI 尚未做端到端验证，暂不声明。
 
 - 宿主半 `lib/index.js`：系统提示注入（索引/全文双模式）、轮末相关召回、`memory` 工具、`/memory/api` 路由、轮次结束自动提炼、打开 DSH 后的启动整理、自动刷新全局画像（WorkBuddy 式主路径）。
-- 客户端半 `lib/client.js`：设置面板里的「记忆」页，三个 tab——**记忆库**（首页只留常驻红线、默认展开的记忆画像与「需要处理」；原料、搜索、整理、导入、迁移、日志收进默认收起的「原料与依据」抽屉；库为空时换成「怎么开始」的引导卡）、**维护**（按系统状态 / 需要我处理 / 自动提炼 / 历史记录排，后者默认收起）、设置（注入 / 记录 / 治理 / 高级与数据四组，保存条吸底）。另有前台会话记忆卡：挂在宿主 `shell.overlay` 上的右下角悬浮卡，采用图标 + 「更新于 YYYY-MM-DD HH:MM」+ 一段话摘要（把本会话沉淀的记忆标题连成一句，草稿与归档不可见）；图标由 `hudIcon` 选择（`a` 官方鲸鱼标默认，`b` 官方 App 图标，`c`–`g` 为二创位图）；可收起 / 拖拽，位置与展开状态存本地；设置页的「该对话记忆」可按对话关闭。卡片只属于当前可见对话：宿主设置弹窗打开、切到插件 / 自动化任务主面板或没有 `[data-conversation-session]` 时整卡隐藏，切换会话时重新拉新会话摘要；弹窗开合与会话 attr 变化走 `MutationObserver`，另有 1 秒兜底轮询。
+- 客户端半 `lib/client.js`：设置面板里的「记忆」页，五个 tab——**项目记忆 / 全局记忆 / 红线**（范围由顶部页签决定：项目页只列本工作区条目与写入工具，全局页放全局画像与全局条目，红线页单列全部绝对禁令（跨范围，不跟页签的 scope 走）；条目区不再藏在抽屉里，档案 / 列表两种切法直接铺在页签里，库为空时换成「怎么开始」的引导卡）、**维护**（按系统状态 / 需要我处理 / 自动提炼 / 历史记录排，后者默认收起）、**设置**（顶部是只读的「记忆概览」——条数、项目/全局占比、类别分布、近 7 天新增、注入预算与画像覆盖（走 `GET /overview` 聚合端点，覆盖全部 active 记录，不为画图拉明细）；下面是「显示与视图」（默认视图 / 档案排布 / 列表密度 / 画像卡、统计行、变化横幅三个开关，只落本机 localStorage，不进宿主配置），再往下是注入 / 记录 / 二级蒸馏 / 治理 / 高级与数据五组，保存条吸底）。另有前台会话记忆卡：挂在宿主 `shell.overlay` 上的右下角悬浮卡，采用图标 + 「更新于 YYYY-MM-DD HH:MM」+ 一段话摘要（把本会话沉淀的记忆标题连成一句，草稿与归档不可见）；图标由 `hudIcon` 选择（`a` 官方鲸鱼标默认，`b` 官方 App 图标，`c`–`g` 为二创位图）；尺寸 / 背景不透明度 / 背景色由 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor` 控制，设置页「会话卡外观」用滑杆与取色器调，拖卡片右下角也能改大小（松手写回配置）；可收起 / 拖拽，位置与展开状态存本地；设置页的「该对话记忆」可按对话关闭。卡片只属于当前可见对话：宿主设置弹窗打开、切到插件 / 自动化任务主面板或没有 `[data-conversation-session]` 时整卡隐藏，切换会话时重新拉新会话摘要；弹窗开合与会话 attr 变化走 `MutationObserver`，另有 1 秒兜底轮询。
 - 纯逻辑层：`lib/store.js`（存储）、`lib/dream.js`（整理管线）、`lib/distill.js`（提炼）、`lib/api.js`（HTTP 契约），都不依赖 DSH，可独立测试。
 
 ## 新增：对齐市场同类后补的十六处
@@ -100,6 +100,7 @@ pwsh -File install.ps1 -FromUrl https://github.com/BangBang-03/dsh-memory-portra
   workspaces/<目录名>-<hash>/portrait.json    工作区画像（版本 + 证据）
   workspaces/<目录名>-<hash>/derivations.json 跨层派生链（画像 / AGENTS.md 的源快照）
   workspaces/<目录名>-<hash>/journal/         每天一个只追加的工作日志
+  workspaces/<目录名>-<hash>/global-distill.json 二级蒸馏台账（素材 / 解析 / 拒绝原因 / 空跑次数）
   workspaces/_global/memories.json            跨工作区共享的全局记忆
   workspaces/_global/candidates.json          二级蒸馏的候选原则池（等跨项目共振）
   backups/<时间戳>-<原因>/                     整库快照（每天一次 + 每次 Dream 前；轮转 7 份）
@@ -219,8 +220,13 @@ JWT / 私钥 / `Bearer` / `password: …` 赋值 / 带凭据的数据库 URI）�
    （禁项目载体、禁常识套话、`topics` 必填）后落 `_global/candidates.json`。
    晋升按**证据强度**分层：`constraint` / `feedback` / `preference` 是用户亲口说的，单项目即可；
    `decision` / `convention` 是推断出来的，要第二个项目出现同主题才认。
-   触发**不是定时任务**——模型自己判断时机（`memory` 的 `distill-global` 动作），兜底是轮末还剩
-   ≥5 条没被任何候选 `anchors` 引用过的素材。候选池的已裁决历史只留最近 200 条（pending 全留）。
+   触发**不是定时任务**——模型自己判断时机（`memory` 的 `distill-global` 动作），兜底是轮末按
+   `globalDistillMinNew`（默认 3 条）检查还没被任何候选 `anchors` 引用过的素材；其中
+   `feedback` / `constraint` / `preference` 未覆盖达到 2 条时也会提前触发（这几类单项目就能晋升）。
+   时间闸自适应：`globalDistillCooldownMinutes`（默认 15 分钟）为底，连续空跑按 2 倍指数退避
+   （上限 24 小时），有产出就清零。候选池的已裁决历史只留最近 200 条（pending 全留）。
+   每次尝试都落 `<ws>/global-distill.json` 台账（素材数 / 解析数 / 拒绝原因计数 / 脱敏原文 /
+   连续空跑次数），维护页显示「上次二级蒸馏」，`/health` 返回 `globalDistill` 字段。
    晋升出来的全局记忆是 `source: auto`、`confidence: 0.75`，维护页可逐条「不再提议」。
 
 6. **路径 JIT**（`pathRecall`，默认开）。给记忆挂 `files`（`memory save` 新增 `files` 参数），
@@ -322,7 +328,7 @@ pwsh -File uninstall.ps1 -PurgeStorage   # 连 ~/.dsh/storages/dsh-memory 一起
 ```powershell
 git checkout lab                       # 默认分支；平时只在这里动
 # …改代码…
-node test/run-all.mjs                  # 本机跑一遍：15 个套件 652 条断言
+node test/run-all.mjs                  # 本机跑一遍：15 个套件 673 条断言
 git add <改动的文件>; git commit -m "feat: …"   # 不要用 git add -A（.probe/ 是本地材料）
 
 $out = node tools/push.mjs --branch lab; $out   # 输出 base = 上一版在本地的对应提交
@@ -408,13 +414,13 @@ CI（`.github/workflows/publish.yml`）在 `lab` 分支推送时发 `-lab.<run_n
 在 `v*` 标签时发 `latest` 正式版；两条线都先跑 5 个纯逻辑层套件，任一套件失败就不发。
 `publish-npmjs.yml` 是另一条手动通道（需要仓库密钥 `NPM_TOKEN`），按需点一次即可。
 
-## 原料：档案视图（收在「原料与依据」抽屉里）
+## 条目：档案视图（项目页 / 全局页共用）
 
-原料条目不再是首页主体：它们收在「原料与依据」抽屉里，形状照着 WorkBuddy 的「记忆与进化」页做。
-抽屉里仍然只有一样东西——**一个工作区一份长记忆**：正文是连续文档，由对话里的 `memory` 工具维护，
+条目不再收在抽屉里：范围由顶部页签决定，条目区就是页签正文，形状照着 WorkBuddy 的「记忆与进化」页做。
+两页共用同一套渲染，里面只有一样东西——**一个范围一份长记忆**：正文是连续文档，由对话里的 `memory` 工具维护，
 用户不需要在这里逐条新建、也不需要理解「条数」。
 
-抽屉里的档案视图有四种排布，用下拉切换（默认是 `整篇文档`）：
+条目区的档案视图有四种排布，用下拉切换（默认是 `整篇文档`）：
 
 | 排布 | 长什么样 | 什么时候用 |
 | --- | --- | --- |
@@ -425,12 +431,16 @@ CI（`.github/workflows/publish.yml`）在 `lab` 分支推送时发 `-lab.<run_n
 
 > v0.3.1 之前这是两个平级视图——「档案」和「记忆空间」——内容完全重合；现在合成一个视图的多种排布。
 
-**记忆库首页**：红线常驻（没有时也给「添加红线」），下面是默认展开的记忆画像和「需要处理 N」；
-原料与工具收在最后一行「原料与依据」抽屉里。首页只回答两个问题：**它现在怎么理解我**、**它绝对不能做什么**。
+**三个记忆页**：项目页回答「这个工作区记住了什么」——顶部常驻工作区选择器（只列真实工作区，排除 `_global` 全局分区，切换后条目区只显示所选工作区），
+旁边是该工作区 `.dsh-memory/MEMORY.md` 的路径、生成状态与「查看文件」预览（内容由记忆库生成，和离线文件同源）；
+正文是「需要处理 N」、24h 变化横幅、条目区，写入开关 / 跨 App 导入 / 迁移 / 工作日志收在最后一行「导入与工具」抽屉里；
+全局页回答「它现在怎么理解我」——记忆画像与全局条目；
+红线页回答「它绝对不能做什么」——跨范围的绝对禁令单列，不再混在全局页里。
+全局页的画像可以在「设置 → 显示与视图」里关掉。
 
 - **红线**：你写的绝对禁令，逐字注入、永久置顶，模型不能改；解除需要你在面板确认。
   没有红线时也保留卡片和「添加红线」入口。添加 / 编辑走专用表单：标题 + 禁令原文，
-  实时显示简报里实际渲染的那一行（标题最多 200 字、正文最多 500 字），新增时可选举工作区 / 全局，
+  实时显示简报里实际渲染的那一行（标题最多 200 字、正文最多 500 字），新增时可选举全局（默认）或工作区，
   多条按加入时间排序。改稿时同时显示「当前生效」与「保存后」两行对照；与现有红线疑似矛盾时先提示，
   二次确认才落库；每次改稿旧措辞进入历史，可查看历史并回滚。
 - **记忆画像**：默认展开；画像由 `autoPortraitHours` 自动刷新（WorkBuddy 式主路径），
@@ -444,15 +454,17 @@ CI（`.github/workflows/publish.yml`）在 `lab` 分支推送时发 `-lab.<run_n
 - **需要处理**：待审草稿 / 待确认矛盾 / 复审到期 / 过期未用 / 失效文件 / 超预算的合计；
   点「查看全部」在首页展开收件箱：待审草稿可批准 / 拒绝，复审到期可标记已复审，
   过期未用可全部归档；待确认矛盾与失效文件给「去整理」入口。没有待处理项时明确显示「没有需要处理的项」。
-- **原料与依据**：默认收起的一行；打开后先看到「导入与工具」（快捷开关、跨 App 导入、画像迁移、
-  工作日志、最近变化），再看到「条目」（档案 / 列表、搜索、标签、整理等）。
+- **顶部页签**：项目记忆 / 全局记忆 / 红线 / 维护 / 设置。范围就是页签本身，不再有范围 chip；
+  项目页只列本工作区条目（顶部可切换工作区，并预览该工作区的 MEMORY.md），全局页放全局画像与全局条目，红线页单独拉全量（含归档，渲染时滤掉）、
+  按记录标 scope，不受页签过滤；项目与全局两页共用同一套条目渲染。
+- **导入与工具**（仅项目页，默认收起）：快捷开关、跨 App 导入、画像迁移、工作日志。
   两行开关点一下即时落库（`POST /settings` 是 patch 合并，只发这一个键）：
   **对话记忆** → `autoCapture`、**本地记忆与技能** → `mirror`。
-- 原料抽屉里的档案视图只留视图切换（档案 / 列表）、排布下拉和正文；
-  **条数统计、范围 chip、搜索框、新建记忆只在列表视图出现；排序、「含已归档」、工作区下拉、
+- 条目区的档案视图只留视图切换（档案 / 列表）、排布下拉和正文；
+  **条数统计、搜索框、新建记忆只在列表视图出现；排序、「含已归档」、工作区下拉、
   标签云收进列表工具栏的「筛选」折叠行。**
   「下次会话将注入」预览区已撤下，条目上的 `✓ 简报` 标记仍保留。
-- 原料抽屉里的分区标题带条数与工作区路径（对标 Qoder 设置里的「项目记忆 / 全局记忆」），点一下折叠；
+- 档案视图的分区标题带条数与工作区路径，点一下折叠；
   「按标签分组」时组内超过两条普通记忆，组头会出现**整合**：把整组合成一条新记忆（标题取标签名，正文按
   `- **标题** — 正文` 逐条列出，类别取组内众数），保存成功后再把原条目批量归档。红线不参与整合，
   措辞原样保留；归档不是删除，切到列表视图勾上「含已归档」就能看到并用「归档」按钮逐条恢复。
@@ -470,10 +482,10 @@ CI（`.github/workflows/publish.yml`）在 `lab` 分支推送时发 `-lab.<run_n
 > 底下仍然是「一条记忆 = 一条记录」，所以导入 WorkBuddy / Qoder 的既有记忆、按标签整合、搜索、
 > 去重这些能力都还在；档案视图只是把它们投影成一篇读得下去的文档，或者一叠分好组的卡片。
 
-## 列表（原料抽屉内）
+## 列表
 
-平铺卡片，适合逐条整理。`共 N条` 后面跟着 `全部范围 / 项目记忆 / 全局记忆` 三个可点 chip，
-点一下只看其中一类；排序、「含已归档」、工作区下拉、类别与标签云收进「筛选」折叠行；
+平铺卡片，适合逐条整理。`共 N条` 跟当前页签的范围一致，置顶数跟在后面；
+排序、「含已归档」、工作区下拉、类别与标签云收进「筛选」折叠行；
 单条记忆的动作在卡片底部一行（编辑 / 置顶 / 归档 / 推翻 / 删除），「新建记忆」留在工具栏。
 
 为什么不是纯平铺：调研过的 C 端记忆（Kimi 记忆空间、ChatGPT、Claude）几乎都是一句话流水账、
@@ -497,6 +509,8 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | `briefMode` | `"index"` | `index` 一行一条索引（省 token）；`full` 标题+正文摘录；`portrait` 全局画像全量（工作区画像已撤）+ 索引清单 |
 | `briefingLimit` | `12` | 注入条数上限（1–50） |
 | `briefingMaxChars` | `2000` | 注入字数上限（200–20000） |
+| `briefingRebuildMinNew` | `3` | 简报重算闸：同一会话内新增记录攒够几条才重算系统提示（1–50；`1` = 写一条就重算） |
+| `briefingRebuildCooldownMs` | `600000` | 简报重算闸（时间）：没攒够条数时，距上次重算满多少毫秒也重算一次（0–3600000；`0` = 有变化就重算） |
 | `portraitMaxChars` | `1400` | 画像注入的字数预算（工作区 + 全局合计；仅 `briefMode=portrait` 生效，200–8000） |
 | `discipline` | `true` | 注入「记忆纪律」一段（何时写什么、对话内指令触发规则） |
 | `rewriteMode` | `"direct"` | 画像重写写入方式：`direct` 直接落库；`draft` 先存待审稿，面板批准后才生效 |
@@ -506,10 +520,16 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | `turnRecallMaxChars` | `800` | 轮末召回块总字符上限（200–4000），超出的条目不注入 |
 | `sectionOrder` | `550` | 注入段落在系统提示里的位置 |
 | `hudIcon` | `"a"` | 前台会话卡图标：`a` 官方鲸鱼标（默认）/ `b` 官方 App 图标 / `c` 可爱鲸鱼 / `d` 深蓝鲸鱼 / `e`–`g` 鲸鱼娘二创位图。二创图标为公开页面素材、作者未署名，对外分发前需确认授权 |
+| `hudWidth` | `340` | 前台会话卡宽度（px，240–640）；设置页「会话卡外观」滑杆，或拖卡片右下角同步调整 |
+| `hudHeight` | `0` | 前台会话卡高度（px，0 = 随内容自适应；固定值 180–720，正文区内部滚动） |
+| `hudOpacity` | `1` | 前台会话卡背景不透明度（0.35–1）。只对底色做 `color-mix`，文字保持清晰；不支持 `color-mix` 的宿主退回不透明底 |
+| `hudColor` | `""` | 前台会话卡背景色（`#rgb` / `#rrggbb`）；空 = 跟随宿主主题。自定义底色时按亮度自动选深色 / 浅色文字 |
 | `autoCapture` | `false` | 轮次结束自动提炼 |
 | `autoDreamDays` | `7` | 启动整理：启动时与轮末检查当前（最近使用的）工作区，距上次（自动或手动）整理满 N 天就在后台整理一次；`0` 关闭（0–365）。没有常驻定时器 |
 | `autoDreamPortrait` | `false` | 自动整理（启动时）是否顺带重写画像；默认关——画像由 `autoPortraitHours` 自动刷新负责。手动 Dream 仍会刷新一版进待审 |
-| `globalDistill` | `true` | 二级蒸馏：把本项目记忆抽成「候选原则」写进全局候选池。**时机由模型决定**（`memory` 工具的 `distill-global` 动作，在一段工作告一段落时显式调用）；兜底是轮末——还剩 5 条以上**没被提炼过**的素材时自动提炼一次（按候选原则的 `anchors` 判断覆盖，不看时间）。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
+| `globalDistill` | `true` | 二级蒸馏：把本项目记忆抽成「候选原则」写进全局候选池。**时机由模型决定**（`memory` 工具的 `distill-global` 动作，在一段工作告一段落时显式调用）；兜底是轮末——按候选原则的 `anchors` 判断「还有几条没提炼过」，再用下两行的自适应间隔控制频次。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
+| `globalDistillMinNew` | `3` | 二级蒸馏的素材门槛：还剩多少条**没被提炼过**的素材才值得再试一次。`feedback` / `constraint` / `preference` 未覆盖达到 2 条时也会触发——这几类单项目就能晋升，优先蒸馏 |
+| `globalDistillCooldownMinutes` | `15` | 二级蒸馏的基础间隔（分钟）。连续空跑按 2 倍指数退避（15m → 30m → 1h … 上限 24h），有产出就回到基础间隔；不是定时任务，素材门槛没过时连时间闸都不看 |
 | `autoPortraitHours` | `6` | 自动刷新全局画像：每 N 小时检查一次，有新素材时调用模型重写；`0` 关闭（0–168）。面板「立即刷新」只是兜底 |
 | `captureMode` | `"direct"` | `direct` 直接落库；`draft` 先进待审队列 |
 | `staleDays` | `60` | 体检里「过期未用」的判定天数 |
@@ -550,7 +570,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | GET | `/redline/history` | 红线当前版本 + 旧版本列表 |
 | POST | `/redline/rollback` | 红线回滚（必须 `confirm: true`；当前版本先写回历史） |
 | POST | `/settings` | 写设置 |
-| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态）与 `candidates` / `candidateItems`（二级蒸馏候选池：待判定计数与明细） |
+| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态）、`candidates` / `candidateItems`（二级蒸馏候选池：待判定计数与明细）与 `globalDistill`（上次二级蒸馏：素材 / 解析 / 拒绝原因 / 脱敏摘要 / 自适应节奏与下次允许时间） |
 | POST | `/health/resolve` | 一键处理：`merge`（合并簇，可带 `title/category/tags/content` 覆盖合并稿；红线与矛盾对会被拒绝）/ `time-order`（对一对矛盾按时序归档旧条，红线 / 置顶 / 用户旧条 / 外部新条会被拒绝）/ `archive`（归档过期）/ `unlink`（摘除断链） |
 | GET | `/timeline` | 全部记忆（含归档、不含草稿）按更新时间倒序 |
 | GET | `/portrait` | 当前画像（工作区 + 全局）、版本列表、段落定义 |
@@ -578,7 +598,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用、二级蒸馏与全局原则晋升 + 画像重写进待审 |
 | POST | `/candidates/reject` | 「不再提议」：把候选原则标成 rejected，之后同主题不再晋升。`{ ids, reason? }` |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
-| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + 当前 `hudIcon` 图标键（卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
+| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + `hudIcon` 图标键 + `hud` 外观（`width` / `height` / `opacity` / `color`；卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
 | GET | `/injections` | 注入审计：最近真正进 prompt 的内容（正文预览 + sha256 前 16 位 + id 列表 + 被挤掉的条目；`full=1` 给原文，`kind` 可过滤） |
 | GET | `/derivations` | 跨层派生链：每层派生了什么、源现在还成不成立（`state` 为 `fresh` / `dirty`，带失效原因） |
 | GET | `/reviews` | 复审队列：带失效条件、到期该复查的记忆（`due` / `soon`） |
@@ -689,9 +709,9 @@ cd <克隆下来的 dsh-memory 目录>
 npm test          # 或 node test/run-all.mjs
 ```
 
-15 个套件、652 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
+15 个套件、673 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
 
-- `store` 168 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
+- `store` 170 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
   工作区不存在时不造目录）、导入导出、并发写；v0.3.0：版本链 supersede/rollback、user 类别强制全局与跨库迁移、
   草稿四不可见、重复簇聚类与合并、体检（重复/过期/断链/草稿）、索引简报预算、镜像版本链线索、keywords 加权、unlink；
   v0.5.0：日志层 journal（按天 `journal/YYYY-MM-DD.md`、只追加，是画像重写的上游原料）、画像的读写与草稿；
@@ -721,31 +741,38 @@ npm test          # 或 node test/run-all.mjs
   Claude 的索引页剔除）。
 - `distill` 42 项 —— 摘录裁剪、模型输出解析容错、触发条件、显式提示词识别；v0.3.0：
   keywords/supersedes 解析、user 类别强制 global、提示词 v2 指引、existingRecords 带 id。
-- `distill-global` 25 项 —— 二级蒸馏的判定层：候选准入（项目载体 / 常识套话 / 长度）、
+- `distill-global` 34 项 —— 二级蒸馏的判定层：候选准入（项目载体 / 常识套话 / 长度）、
   按证据强度分层的晋升门槛（constraint / feedback / preference 单项目即可，decision / convention 要第二个项目）、
-  主题词聚类与项目去重、模型输出解析容错，以及「候选池 → 晋升」的端到端链路。
-- `api` 88 项 —— 53 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
+  主题词聚类与项目去重、模型输出解析容错（按类别分层的锚点底线、空数组 / 坏 JSON / 全被拒绝的诊断计数、
+  对象包数组的容错），自适应节奏公式（空跑指数退避、素材闸 + 用户证据捷径），以及「候选池 → 晋升」端到端链路。
+- `api` 89 项 —— 54 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
   /health 与 /health/resolve、/timeline、草稿队列（批准带编辑 / 拒绝 / 带 supersedes 的批准兑现版本链）、
   /save 带 supersedes 与 /supersede/rollback；v0.6：`GET /portrait/diff`（上一版 → 当前版的逐段 diff）；
   0.6.4：`GET /record` 依据下钻、`/redline/check` 冲突检查、`/redline/update` 改稿审计、
   `/redline/history` 与 `/redline/rollback`、Dream 时序矛盾归档与 `/health/resolve time-order`。
-- `host` 19 项 —— 导出形状、Config 默认值与越界校验。
-- `activate` 59 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
+- `host` 22 项 —— 导出形状、Config 默认值与越界校验（含二级蒸馏的素材门槛 / 基础间隔）、C7 文档覆盖闸。
+- `activate` 65 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
   工具 save/search/get/forget、全文简报装不下时明说「只列了 N / M 条」、`/memory/api/*` 路由真的应答
   且守好 403/404、手动提炼端到端、面板保存落到工作区镜像、既有记忆扫描导入、数据目录不可用不炸外壳；
   v0.3.0：索引简报（带 id 不展开正文 + full 模式对照）、轮末召回（召回块出现、连续两轮不重复）、
   captureMode=draft 全流程（进队列 → 不进列表 → 日志 drafted → 批准生效）、
   工具 save 带 supersedes（旧条归档、get 展示版本链）；v0.5.0：`action=journal` 写入回读与空文本拒绝、
   journal API（写 / 读 / 日期校验）、画像重写（draft 进待审、direct 直接落库）、提示段里的写入纪律；
-  画像重写容错：严格提示重试一次、两次都失败时的可读明细与脱敏日志、有损结果改送待审。
-- `briefing-stability` 15 项 —— 会话级冻结快照、确定性排序、轮末召回的尾部注入与去重；
+  画像重写容错：严格提示重试一次、两次都失败时的可读明细与脱敏日志、有损结果改送待审；
+  没有会话请求头时回落到宿主默认模型，连默认模型都没有时错误明细是可操作的一句话；
+  二级蒸馏空产出 / 全被准入挡掉时，台账与 `/health` 能看到原因、拒绝计数与脱敏原文；
+  重复表述不新增候选时按「没有进展」进入退避，不会每 15 分钟重跑同样的调用；
+  轮末自动链路（capture → distillDue → runGlobalDistill → 落候选池）也有端到端用例。
+- `briefing-stability` 17 项 —— 会话级冻结快照、确定性排序、轮末召回的尾部注入与去重；
   改检索算法时用它守住「系统提示字节稳定」。
-- `client` 69 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
+- `client` 75 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
   接到真实 `store` + `api` 上驱动交互（列表 / 搜索 / 新建 / 删除 / 置顶 / 中英文切换 / 后端报错）；
-  档案视图的分区与两种排布、整篇编辑、整理、开关即时落库、时间线与维护 tab；
+  档案视图的分区与两种排布、整篇编辑、整理、开关即时落库、时间线与维护 tab、五个页签
+  （项目 / 全局 / 红线各自独立，红线不再混在全局页）、项目页切换工作区后只显示该工作区的条目并预览其 MEMORY.md；
   0.6.4：三页签与首页四块（红线 / 画像 / 需要处理 / 原料抽屉）、红线专用编辑器（预览 / 冲突二次确认 /
   历史回滚）、画像逐段编辑与依据下钻、收件箱就地批准草稿、原料抽屉默认收起、
-  Dream 时序矛盾报告与待确认项手动归档。
+  Dream 时序矛盾报告与待确认项手动归档；重写失败时把 `detail` 字符串与错误码一起显示（不是只剩一个裸错误码）；
+  维护页的二级蒸馏卡显示上次素材 / 解析 / 拒绝原因 / 自适应节奏与脱敏原文。
 - `install` 16 项 —— 在临时目录里搭假 DSH 主目录，真跑 `install.ps1` / `uninstall.ps1`：
   备份内容与原始一致、幂等、`-DryRun` 不落盘、卸载还原、`-PurgeStorage` 才删数据、
   0.3.2 之前的老别名安装会被自动迁移（清 bundles / dependencies 条目 + 摘旧 junction）、

@@ -55,7 +55,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | **P3** | git 与 REST 两条推送通道**不要混用** | REST 重建的提交时区归一成 `+0000`，同树不同 SHA，混推就是分叉 |
 | **P4** | 改 `~/.dsh/profiles/**` 前必须备份（`install.ps1` 自带秒级时间戳备份，手工改也要先备份） | 把用户的 DSH 装坏且无从回滚 |
 | **P5** | 卸载 / 替换只动 junction 与清单项；碰到同名**真实目录**直接报错退出，不许 `Remove-Item -Recurse` | PowerShell 5.1 会跟进 junction 删到共享的 `@deepseek-ai/*`（脚本里已专门防这一步） |
-| **P6** | 改完跑 `node test/run-all.mjs`（15 套件 / 652 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
+| **P6** | 改完跑 `node test/run-all.mjs`（15 套件 / 673 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
 | **P7** | 不加运行时依赖：`dependencies` 保持空，`peerDependencies` 全 optional，`lib/*.js` 只许 import `node:*` 与相对路径 | 插件要在用户机器上零安装；加依赖等于要求所有人重装 |
 | **P8** | 正式版只在 `main` 打 `v*` 标签，且 `package.json` 不许是预发布号（`-lab.N` / `-rc.N` 等）；打标签前 `main` 必须已推送并通过测试；不手改远端保护设置 | 标签挂在旧提交上，`/releases/latest` 发出去的就是旧代码；预发布号漏上去再也升不回来。完整步骤与验收见 `skills/release/SKILL.md` |
 
@@ -73,11 +73,12 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 检索打分（BM25F / 精确短语 / related 一跳 / 同义词扩展） | `lib/retrieval.js` | `test/fixtures/retrieval-hard-60.json`、`docs/retrieval-eval-2026-10-20.md` | `retrieval` |
 | 简报注入、`memory` 工具、轮末召回、路径 JIT、路由挂载、Config schema | `lib/index.js` | `lib/portrait.js`、`lib/api.js` | `activate` + `briefing-stability` + `host` |
 | HTTP 端点、错误码、参数校验 | `lib/api.js` | README「HTTP 契约」表 | `api` |
-| 设置面板 UI（三个 tab、首页红线/画像/收件箱、原料抽屉、维护页、图标标记） | `lib/client.js` | `test/mini-react.mjs`、`locale/*.json` | `client` |
-| 前台会话记忆卡（Qoder 式摘要卡：图标 + 更新时间 + 一段话摘要；图标可选 `hudIcon`；可收起/拖拽、位置持久化、按对话开关） | `lib/client.js` 的 `SessionMemoryHud` / `HUD_ICONS` | `lib/api.js` 的 `/session-brief`、`lib/store.js` 的 `sessionSearch`、`lib/index.js` 的 `workspaceForSession` / `activeSession` / `hudIcon` | `client` + `api` |
+| 设置面板 UI（五个 tab：项目记忆 / 全局记忆 / 红线 / 维护 / 设置；项目页工作区选择器与 MEMORY.md 预览、条目区、红线工作台、工具抽屉、设置页概览与显示选项、维护页、图标标记） | `lib/client.js` | `test/mini-react.mjs`、`locale/*.json` | `client` |
+| 前台会话记忆卡（Qoder 式摘要卡：图标 + 更新时间 + 一段话摘要；图标可选 `hudIcon`；尺寸 / 背景不透明度 / 背景色可选 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor`；可收起/拖拽、位置持久化、按对话开关） | `lib/client.js` 的 `SessionMemoryHud` / `HUD_ICONS` | `lib/api.js` 的 `/session-brief`（返回 `icon` + `hud` 外观）、`lib/store.js` 的 `sessionSearch`、`lib/index.js` 的 `workspaceForSession` / `activeSession` / `hud*` 配置 | `client` + `api` |
 | 清单兼容口径 / 市场元数据（`engines.dsh`、`dshReleases`、`marketplace`、`permissions`） | `package.json` | `README.md` 的「兼容性」、`tools/check-compat.mjs`、`.github/workflows/publish*.yml` | `host` + `node tools/check-compat.mjs` |
 | 提炼提示词、模型输出容错、触发条件 | `lib/distill.js` | `lib/index.js` 里的 capture 流程 | `distill` |
 | 全局原则晋升（候选准入 / 分层门槛 / 主题聚类 / 晋升执行） | `lib/distill-global.js` | `lib/index.js` 的 `runGlobalDistill` 与 `maybeDistillGlobally`、`docs/global-distill-trial-2026-11-05.md` | `distill-global` |
+| 二级蒸馏节奏与空产出诊断（`globalDistillMinNew` / `globalDistillCooldownMinutes` / `global-distill.json`） | `lib/distill-global.js` 的 `distillCadence` / `distillDue` / `analyzeGlobalDistill` | `lib/index.js` 的 `runGlobalDistill`、`lib/api.js` 的 `/health`、`lib/store.js` 的 `globalDistillState`、`lib/client.js` 维护页卡 | `distill-global` + `activate` + `api` + `client` |
 | 全局候选原则池（候选读写与裁决标记） | `lib/store.js` 的 `candidates` | `lib/distill-global.js`、`skills/global-distill/SKILL.md` | `store` + `distill-global` |
 | 交付前自查（发版前的必经步骤） | `skills/delivery-check/SKILL.md` | `skills/release/SKILL.md` 的 0.5 步、`test/run-all.mjs` 与 `tools/doc-numbers.mjs` 的闸门 | `host`（并跑一次 `run-all`） |
 | 文档里的断言总数与套件数校验 | `tools/doc-numbers.mjs` | `test/run-all.mjs` 的收尾段、`test/host.test.mjs` 的两条校验器测试 | `host`（并跑一次 `run-all` 看闸门） |
@@ -115,6 +116,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | Dream / 整理合并了红线、置顶丢失、正反结论被揉成一条 | `clusterDuplicates()` 排除红线与矛盾对；`consolidateCluster()` 返回 `redline_protected` / `contradiction_pair` 并继承 `pinned`；面板整理走 `/health/resolve merge`，不走 `/save` + `/bulk` |
 | Dream 报「N 步出错」但只显示画像未触发 | 画像重写失败码是否被分类为跳过（`no_model_route` / `llm_unavailable` / `no_material` / `disabled` / `already_running` / `no_workspace`）；真实失败应在客户端显示步骤与明细 |
 | Dream 报「画像：重写结果解析失败（no_json）」 | 模型没按 JSON 输出。`parseRewriteResponse` 已能修裸换行 / 尾逗号、抢救截断与整体坏掉的输出；仍失败时宿主会用 `REWRITE_STRICT_SYSTEM` 重试一次，两次都失败才报错。宿主日志里有一条脱敏摘要（`画像重写解析失败`）可查原文形态 |
+| 二级蒸馏一直没有候选 / 维护页「上次二级蒸馏」显示空产出 | 看 `/health` 的 `globalDistill.lastReason`：`empty`=模型回了空数组、`all_rejected`=候选全被准入挡掉（看 `lastRejects`）、`bad_json` / `none` / `not_array`=输出格式坏了（看 `lastExcerpt`）；`duplicate`=本次原则都已在池里（按没有进展退避）。`decision` / `convention` 单项目永远不晋升，要第二个项目共振。素材门槛 / 间隔看 `globalDistillMinNew` / `globalDistillCooldownMinutes` |
 | Dream 后旧结论仍在 / 待确认矛盾反复出现 | 正常：Dream 只报告词法线索，不自动归档。确认一对走 `/health/resolve time-order`；保护边界是红线 / 置顶 / `user_older` / `external_newer` / `mixed_scope` |
 | 红线冲突提示误报 / 漏报 | `redlineConflicts()` 复用 `detectContradictions()` 的疑似矛盾词法规则，是启发式；调阈值/否定词时同步 `store` 与 `api` 的红线测试 |
 | 首页「需要处理」数字与收件箱不一致 | `healthData` / `queueData` / `reviewData` 的拉取条件；收件箱只在 `attentionOpen` 时拉 queue / reviews |
@@ -159,7 +161,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 ## 3. 命令速查
 
 ```powershell
-node test/run-all.mjs                  # 15 套件 / 652 断言，改完必跑（P6）
+node test/run-all.mjs                  # 15 套件 / 673 断言，改完必跑（P6）
 node test/store.test.mjs               # 单套件：把 store 换成 retrieval / api / client …
 
 pwsh -File install.ps1 -DryRun         # 只看要改什么，不落盘

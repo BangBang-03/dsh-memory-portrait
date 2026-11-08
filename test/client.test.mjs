@@ -47,6 +47,8 @@ const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-memory-client-'));
 const WS = process.platform === 'win32' ? 'C:\\proj\\记忆客户端' : '/proj/memory-client';
+/* 第二个工作区：只用于验证「项目记忆可切换工作区」，它没有真实目录。 */
+const WS2 = process.platform === 'win32' ? 'C:\\proj\\记忆客户端二' : '/proj/memory-client-2';
 
 const store = createMemoryStore({ dir: path.join(tmp, 'storage'), mirror: true });
 
@@ -58,6 +60,10 @@ let settingsValue = {
   mirror: true,
   minConfidence: 0.4,
   hudIcon: 'a',
+  hudWidth: 340,
+  hudHeight: 0,
+  hudOpacity: 1,
+  hudColor: '',
 };
 const settings = {
   get: () => ({ ...settingsValue }),
@@ -74,7 +80,10 @@ const api = createApi({
   store,
   settings,
   activeWorkspace: () => WS,
-  listWorkspaces: () => [{ root: WS, key: 'k', count: 0, active: true }],
+  listWorkspaces: () => [
+    { root: WS, key: 'k', count: 0, active: true },
+    { root: WS2, key: 'k2', count: 0, active: false },
+  ],
   activeSession: () => ({ id: 's-hud', workspace: WS }),
   captures: () => captures,
   version: '0.1.0',
@@ -109,7 +118,7 @@ async function fetchStub(target, init = {}) {
   for (const [key, value] of parsed.searchParams.entries()) query[key] = value;
   let body;
   if (typeof init.body === 'string' && init.body.length) body = JSON.parse(init.body);
-  fetchCalls.push({ method: init.method || 'GET', pathname: parsed.pathname, body });
+  fetchCalls.push({ method: init.method || 'GET', pathname: parsed.pathname, body, query });
   const result = await activeApi.handle({
     method: init.method || 'GET',
     pathname: parsed.pathname,
@@ -492,13 +501,30 @@ const setLayout = async (value, locale = 'zh') => {
   await settle(8);
 };
 
-await test('首屏渲染出三条记忆与统计', async () => {
+/* tab 按钮可能带数量徽标（如「维护 2」），用 startsWith 而不是全等。 */
+const clickTab = async (key, locale = 'zh') => {
+  const label = makeT(locale)(key);
+  const button = mini
+    .findAll(view, (node) => node.type === 'button' && mini.textOf(node).includes(label))
+    .find((node) => mini.textOf(node).trim().startsWith(label));
+  assert.ok(button, `找不到 tab：${label}`);
+  mini.click(button);
+  await settle(8);
+};
+
+/** 画像在全局页签：渲染后先切过去。 */
+const openGlobalTab = async () => {
+  await clickTab('tabGlobal');
+  await settle(10);
+};
+
+await test('首屏渲染出项目记忆与统计，全局记忆在自己的页签里', async () => {
   renderPage('zh');
   await settle();
   const body = text();
   assert.match(body, /插件安装方式/);
   assert.match(body, /alpha 约定/);
-  assert.match(body, /全局偏好/);
+  assert.doesNotMatch(body, /全局偏好/, '全局记忆不该混进项目记忆页');
   // 档案视图是「一个工作区一份长记忆」：只有视图切换、两个开关和正文，
   // 条数统计、搜索框、排序、新建这些管理动作全部收进列表视图。
   assert.doesNotMatch(body, /共 \d+条/, '档案视图不该出现条数统计');
@@ -508,13 +534,17 @@ await test('首屏渲染出三条记忆与统计', async () => {
     '档案视图不该出现搜索框',
   );
   assert.match(body, /直接在对话里说/, '档案视图缺少「在对话里加记忆」的提示');
-  // 切到列表视图才能看到条数与范围统计（列表把「项目记忆 / 全局记忆」分开统计，和 Qoder 的划分一致）。
+  // 切到列表视图才能看到条数统计。
   await switchView('viewList');
   const list = text();
-  assert.match(list, /共 3条/);
-  assert.match(list, /项目记忆 2/);
-  assert.match(list, /全局记忆 1/);
+  assert.match(list, /共 2条/);
   assert.ok(list.includes(makeT('zh')('nav')), '缺少导航标签');
+
+  // 全局页签只装全局记忆。
+  await clickTab('tabGlobal');
+  await settle(10);
+  assert.match(text(), /全局偏好/);
+  assert.doesNotMatch(text(), /插件安装方式/, '项目记忆不该出现在全局页');
 });
 
 await test('页面确实读了宿主 /state 与 /list', () => {
@@ -527,19 +557,81 @@ await test('页面确实读了宿主 /state 与 /list', () => {
   );
 });
 
-await test('顶部只留记忆/维护/设置三个页签，自动提炼并入维护', async () => {
+await test('顶部五个页签：项目记忆 / 全局记忆 / 红线 / 维护 / 设置', async () => {
   renderPage('zh');
   await settle(8);
   const tabs = mini.findAll(
     view,
     (node) => node.type === 'button' && String(node.props.className || '').split(/\s+/).includes('dshmem_tab'),
   );
-  assert.equal(tabs.length, 3, '顶层页签应只剩三个');
+  assert.equal(tabs.length, 5, '顶层页签应有五个');
   const labels = tabs.map((node) => mini.textOf(node).trim());
-  assert.ok(labels.some((label) => label.startsWith(makeT('zh')('tabMemories'))));
+  assert.ok(labels.some((label) => label.startsWith(makeT('zh')('tabProject'))), '缺少项目记忆页签');
+  assert.ok(labels.some((label) => label.startsWith(makeT('zh')('tabGlobal'))), '缺少全局记忆页签');
+  assert.ok(labels.some((label) => label.startsWith(makeT('zh')('tabRedline'))), '缺少红线页签');
   assert.ok(labels.some((label) => label.startsWith(makeT('zh')('tabMaintain'))));
   assert.ok(labels.some((label) => label.startsWith(makeT('zh')('tabSettings'))));
   assert.ok(!labels.some((label) => label.includes(makeT('zh')('tabCapture'))), '自动提炼不应再是顶层页签');
+
+  /* 三个记忆页签相邻，且排在维护 / 设置之前——项目、全局、红线各自独立。 */
+  const order = ['tabProject', 'tabGlobal', 'tabRedline', 'tabMaintain', 'tabSettings'].map((key) =>
+    labels.findIndex((label) => label.startsWith(makeT('zh')(key))),
+  );
+  assert.ok(
+    order.every((index, i) => index >= 0 && (i === 0 || index > order[i - 1])),
+    `页签顺序不对：${labels.join(' / ')}`,
+  );
+
+  /* 在全局页新建记忆，范围默认要落在全局，而不是项目。 */
+  await clickTab('tabGlobal');
+  await switchView('viewList');
+  mini.click(mini.findByText(view, makeT('zh')('newMemory'), 'button'));
+  await settle(6);
+  const scopeSelect = mini.findAllByTag(view, 'select').find((node) => node.props.value === 'global');
+  assert.ok(scopeSelect, '全局页新建记忆应默认「全局」范围');
+  mini.click(mini.findByText(view, makeT('zh')('cancel'), 'button'));
+  await settle(4);
+});
+
+await test('项目记忆：可切换工作区，只显示该工作区的条目与 MEMORY.md', async () => {
+  store.upsert(
+    { title: '第二个工作区条目', content: '只属于第二个工作区。', category: 'fact' },
+    { workspace: WS2 },
+  );
+
+  renderPage('zh');
+  await settle(10);
+
+  /* 工作区选择器常驻在项目页顶部，而不是藏在列表筛选行里。 */
+  const select = mini
+    .findAllByTag(view, 'select')
+    .find((node) => node.props.title === makeT('zh')('projectSwitchHint'));
+  assert.ok(select, '项目页缺少工作区选择器');
+  assert.match(mini.textOf(select), /记忆客户端二/, '选择器应列出其它工作区');
+  assert.match(text(), new RegExp(escapeRe(makeT('zh')('projectOnlyHint'))), '缺少「只显示本工作区」的说明');
+
+  /* 切到第二个工作区：只显示它的条目，前一个工作区的条目不再出现。 */
+  select.props.onChange({ target: { value: WS2 } });
+  await settle(16);
+  const body = text();
+  assert.match(body, new RegExp(escapeRe(WS2)), '应显示所选工作区的路径');
+  assert.match(body, /第二个工作区条目/, '应显示所选工作区的记忆');
+  assert.doesNotMatch(body, /插件安装方式/, '切换后不该再显示上一个工作区的记忆');
+
+  /* 工作区 MEMORY.md：路径跟着所选工作区，展开后是该工作区的镜像正文。 */
+  assert.match(body, /\.dsh-memory/, '缺少工作区 MEMORY.md 的路径');
+  const showButton = mini.findByText(view, makeT('zh')('projectMirrorShow'), 'button');
+  assert.ok(showButton, '缺少 MEMORY.md 查看入口');
+  mini.click(showButton);
+  await settle(12);
+  const pre = mini.findAll(
+    view,
+    (node) => String(node.props?.className || '').split(/\s+/).includes('dshmem_wsfileBody'),
+  )[0];
+  assert.ok(pre, '展开后应渲染 MEMORY.md 正文');
+  const mirrored = mini.textOf(pre);
+  assert.match(mirrored, /项目记忆 —/, 'MEMORY.md 应带镜像文件头');
+  assert.match(mirrored, /第二个工作区条目/, 'MEMORY.md 应是所选工作区的内容');
 });
 
 await test('原料与依据抽屉默认收起，点击后展开', async () => {
@@ -564,6 +656,9 @@ await test('原料与依据抽屉默认收起，点击后展开', async () => {
 
 await test('红线空态提供「添加红线」，打开专用编辑器', async () => {
   renderPage('zh');
+  await settle(8);
+  /* 红线在独立页签里，跨范围单列。 */
+  await clickTab('tabRedline');
   await settle(8);
   const add = mini.findByText(view, makeT('zh')('redlineAdd'), 'button');
   assert.ok(add, '缺少添加红线入口');
@@ -854,6 +949,167 @@ await test('切到设置页会渲染开关与保存按钮', async () => {
   );
 });
 
+/* 注意要整词匹配：class 里 dshmem_section 是 dshmem_sectionHead/_Title 的前缀。
+   用函数声明而不是 const：前面的工作区用例也要用它，声明会提升。 */
+function byClass(name) {
+  return (node) =>
+    String((node && node.props && node.props.className) || '')
+      .split(/\s+/)
+      .includes(name);
+}
+
+/* ---------------- 设置页：会话卡外观 ---------------- */
+
+await test('设置页：会话卡大小 / 不透明度 / 颜色可调并写进设置', async () => {
+  const t = makeT('zh');
+  renderPage('zh');
+  await settle(10);
+  await clickTab('tabSettings');
+  await settle(12);
+
+  const body = text();
+  for (const key of ['hudWidthLabel', 'hudHeightLabel', 'hudOpacityLabel', 'hudColorLabel']) {
+    assert.match(body, new RegExp(escapeRe(t(key))), `设置页缺少 ${key}`);
+  }
+
+  const ranges = mini.findAll(view, (node) => node.type === 'input' && node.props?.type === 'range');
+  const widthSlider = ranges.find((node) => String(node.props.min) === '240');
+  const heightSlider = ranges.find((node) => String(node.props.min) === '180');
+  const opacitySlider = ranges.find((node) => String(node.props.min) === '0.35');
+  assert.ok(widthSlider, '缺少卡片宽度滑杆');
+  assert.ok(heightSlider, '缺少卡片高度滑杆');
+  assert.ok(opacitySlider, '缺少背景不透明度滑杆');
+  assert.equal(String(widthSlider.props.value), '340', '宽度滑杆默认 340');
+  assert.equal(String(heightSlider.props.value), '180', '高度自适应时滑杆停在最小值');
+
+  widthSlider.props.onChange({ target: { value: '420' } });
+  heightSlider.props.onChange({ target: { value: '300' } });
+  opacitySlider.props.onChange({ target: { value: '0.6' } });
+  await settle(4);
+
+  const color = mini.findAll(view, (node) => node.type === 'input' && node.props?.type === 'color')[0];
+  assert.ok(color, '缺少背景颜色选择器');
+  color.props.onChange({ target: { value: '#101828' } });
+  await settle(4);
+
+  const save = mini.findByText(handle.tree, t('save'), 'button');
+  assert.ok(save, '找不到保存按钮');
+  mini.click(save);
+  await settle(12);
+
+  assert.equal(settingsValue.hudWidth, 420, '宽度没有写进设置');
+  assert.equal(settingsValue.hudHeight, 300, '固定高度没有写进设置');
+  assert.equal(settingsValue.hudOpacity, 0.6, '不透明度没有写进设置');
+  assert.equal(settingsValue.hudColor, '#101828', '背景颜色没有写进设置');
+
+  /* 恢复默认，避免影响后面的前台卡断言。 */
+  settingsValue.hudWidth = 340;
+  settingsValue.hudHeight = 0;
+  settingsValue.hudOpacity = 1;
+  settingsValue.hudColor = '';
+});
+
+/* ---------------- 设置页：记忆概览 + 显示与视图 ---------------- */
+
+await test('设置页：记忆概览把条数、类别、趋势、预算与画像画出来', async () => {
+  fetchCalls.length = 0;
+  renderPage('zh');
+  await settle(10);
+  await clickTab('tabSettings');
+  await settle(12);
+
+  const body = text();
+  assert.match(body, new RegExp(escapeRe(makeT('zh')('overviewTitle'))), '缺少记忆概览卡');
+  assert.match(body, new RegExp(escapeRe(makeT('zh')('overviewHint'))), '概览缺少只读说明');
+
+  const tiles = mini.findAll(view, byClass('dshmem_tile'));
+  assert.equal(tiles.length, 4, '概览应有四个数字块（项目 / 全局 / 待审 / 红线）');
+  const tileText = tiles.map((node) => mini.textOf(node)).join(' | ');
+  assert.ok(tileText.includes(makeT('zh')('ovProject')), '缺少项目数字块');
+  assert.ok(tileText.includes(makeT('zh')('ovRedlines')), '缺少红线数字块');
+
+  assert.ok(mini.findAll(view, byClass('dshmem_catRow')).length > 0, '缺少类别分布条');
+  assert.equal(mini.findAll(view, byClass('dshmem_trendCol')).length, 7, '近 7 天应有 7 根柱');
+  assert.equal(mini.findAll(view, byClass('dshmem_meter')).length, 2, '预算与画像应各有一条计量');
+
+  /* 概览走聚合端点：不为画图拉一份明细，也不再借用列表请求。 */
+  assert.ok(
+    fetchCalls.some((call) => call.pathname === `${API_PREFIX}/overview`),
+    '设置页应请求 /overview 聚合数据',
+  );
+  assert.equal(
+    fetchCalls.some((call) => call.pathname === `${API_PREFIX}/list` && call.query?.limit === '1000'),
+    false,
+    '概览不该再靠 /list 拉 1000 条明细',
+  );
+
+  /* 概览是只读的：打开设置页不该产生任何写请求。 */
+  assert.equal(
+    fetchCalls.filter((call) => call.method === 'POST').length,
+    0,
+    '概览不该写任何东西',
+  );
+
+  assert.match(body, new RegExp(escapeRe(makeT('zh')('viewGroup'))), '缺少显示与视图分组');
+  assert.ok(mini.findByText(view, makeT('zh')('uiDensityCompact'), 'button'), '缺少紧凑密度选项');
+});
+
+await test('显示与视图：默认视图 / 密度 / 区块开关立即生效并只落本机', async () => {
+  fetchCalls.length = 0;
+  renderPage('zh');
+  await settle(8);
+  await clickTab('tabSettings');
+  await settle(12);
+
+  const buttonByText = (label) =>
+    mini.findAll(view, (node) => node.type === 'button' && mini.textOf(node).trim() === label)[0];
+  const switchByText = (label) =>
+    mini
+      .findAll(view, (node) => (node.props?.className || '').split(/\s+/).includes('dshmem_switch'))
+      .find((node) => mini.textOf(node).includes(label));
+
+  mini.click(buttonByText(makeT('zh')('viewList')));
+  await settle(6);
+  mini.click(buttonByText(makeT('zh')('uiDensityCompact')));
+  await settle(6);
+
+  const portraitSwitch = switchByText(makeT('zh')('uiShowPortrait'));
+  assert.ok(portraitSwitch, '缺少画像的显示开关');
+  mini.findAll(portraitSwitch, (node) => node.type === 'input')[0].props.onChange({ target: { checked: false } });
+  await settle(4);
+
+  assert.equal(
+    fetchCalls.filter((call) => call.method === 'POST').length,
+    0,
+    '显示偏好只落本机，不该写宿主设置',
+  );
+  const saved = JSON.parse(storage.get('dsh-memory:ui') || '{}');
+  assert.equal(saved.view, 'list', '默认视图应写进本机偏好');
+  assert.equal(saved.density, 'compact', '密度应写进本机偏好');
+  assert.equal(saved.showPortrait, false, '画像开关应写进本机偏好');
+
+  /* 回到记忆页：列表视图 + 紧凑密度生效；全局页只放画像，红线在独立页签。 */
+  await clickTab('tabProject');
+  await settle(10);
+  assert.match(text(), /共 \d+条/, '默认视图切成列表后应直接是列表');
+  assert.ok(
+    mini.findAll(view, byClass('dshmem_dense')).length === 1,
+    '紧凑密度应加在记忆页容器上',
+  );
+
+  await clickTab('tabGlobal');
+  await settle(10);
+  assert.doesNotMatch(text(), new RegExp(escapeRe(makeT('zh')('portraitTitle'))), '关掉后不该再渲染画像卡');
+  assert.doesNotMatch(text(), new RegExp(escapeRe(makeT('zh')('redlineTitle'))), '红线不该再混在全局页');
+
+  await clickTab('tabRedline');
+  await settle(10);
+  assert.match(text(), new RegExp(escapeRe(makeT('zh')('redlineTitle'))), '红线页签应始终渲染红线区');
+
+  /* 这套偏好是本机的，测试之间清干净，别影响后面的用例。 */
+  storage.delete('dsh-memory:ui');
+});
+
 /* ---------------- 档案视图：项目/全局分区 + 可选的按标签分组 ---------------- */
 
 /* 造两组同标签的记忆，才用得上「整合」；另外造一条全局的，验证分区不串。 */
@@ -869,13 +1125,7 @@ for (const seed of [
   });
 }
 
-/* 注意要整词匹配：class 里 dshmem_section 是 dshmem_sectionHead/_Title 的前缀。 */
-const byClass = (name) => (node) =>
-  String((node && node.props && node.props.className) || '')
-    .split(/\s+/)
-    .includes(name);
-
-await test('档案视图按「项目记忆 / 全局记忆」分区，可切成按标签归类', async () => {
+await test('档案视图按页签分范围，可切成按标签归类', async () => {
   renderPage('zh');
   await settle(10);
 
@@ -885,23 +1135,19 @@ await test('档案视图按「项目记忆 / 全局记忆」分区，可切成�
 
   await setLayout('tag');
 
-  const sections = mini.findAll(view, byClass('dshmem_section'));
-  assert.equal(sections.length, 2, `应该有两个分区，实际 ${sections.length} 个`);
-  const [project, global] = sections.map((node) => mini.textOf(node));
+  let sections = mini.findAll(view, byClass('dshmem_section'));
+  assert.equal(sections.length, 1, `项目页应该只有一个分区，实际 ${sections.length} 个`);
+  const project = mini.textOf(sections[0]);
   assert.match(project, /项目记忆/);
-  assert.match(global, /全局记忆/);
   assert.match(project, /空间甲/, '项目分区里没有本工作区的记忆');
-  assert.match(global, /空间全局/, '全局分区里没有全局记忆');
-  assert.doesNotMatch(project, /空间全局/, '全局记忆混进了项目分区');
-  assert.doesNotMatch(global, /空间甲/, '项目记忆混进了全局分区');
+  assert.doesNotMatch(project, /空间全局/, '全局记忆混进了项目页');
 
-  const groups = mini.findAll(view, byClass('dshmem_group'));
-  const spaceGroups = groups.filter((node) => mini.textOf(node).startsWith('▾ #space'));
-  assert.equal(spaceGroups.length, 2, '#space 应该分别在两个分区里各成一组');
+  let groups = mini.findAll(view, byClass('dshmem_group'));
+  let spaceGroups = groups.filter((node) => mini.textOf(node).startsWith('▾ #space'));
+  assert.equal(spaceGroups.length, 1, '#space 应该在项目页成一组');
   assert.match(mini.textOf(spaceGroups[0]), /空间甲/);
   assert.match(mini.textOf(spaceGroups[0]), /空间乙/);
-  assert.match(mini.textOf(spaceGroups[1]), /空间全局/);
-  assert.doesNotMatch(mini.textOf(spaceGroups[1]), /空间甲/);
+  assert.doesNotMatch(mini.textOf(spaceGroups[0]), /空间全局/);
 
   /* 没有标签的记忆落到「未归类」，且排在最后。 */
   const labels = groups.map((node) => mini.textOf(node).slice(0, 8));
@@ -910,6 +1156,21 @@ await test('档案视图按「项目记忆 / 全局记忆」分区，可切成�
     labels[labels.length - 1].includes('未归类'),
     `「未归类」应该排在最后，实际顺序：${labels.join(' | ')}`,
   );
+
+  /* 切到全局页签：分区只剩全局那一个，项目条目一条都不该跟过来。 */
+  await clickTab('tabGlobal');
+  await settle(10);
+  sections = mini.findAll(view, byClass('dshmem_section'));
+  assert.equal(sections.length, 1, `全局页应该只有一个分区，实际 ${sections.length} 个`);
+  const global = mini.textOf(sections[0]);
+  assert.match(global, /全局记忆/);
+  assert.match(global, /空间全局/, '全局分区里没有全局记忆');
+  assert.doesNotMatch(global, /空间甲/, '项目记忆混进了全局页');
+  groups = mini.findAll(view, byClass('dshmem_group'));
+  spaceGroups = groups.filter((node) => mini.textOf(node).startsWith('▾ #space'));
+  assert.equal(spaceGroups.length, 1);
+  assert.match(mini.textOf(spaceGroups[0]), /空间全局/);
+  assert.doesNotMatch(mini.textOf(spaceGroups[0]), /空间甲/);
 });
 
 await test('分区与分组都能折叠', async () => {
@@ -932,13 +1193,27 @@ await test('分区与分组都能折叠', async () => {
   await settle(8);
   assert.match(text(), /甲的内容/, '再点一次没能展开');
 
-  const globalHead = mini.findAll(view, byClass('dshmem_sectionHead'))[1];
+  /* 项目页只有一个分区；折叠它，条目不出现但标题还在。 */
+  const projectHead = mini.findAll(view, byClass('dshmem_sectionHead'))[0];
+  assert.ok(projectHead, '找不到项目分区头');
+  mini.click(projectHead);
+  await settle(8);
+  assert.doesNotMatch(text(), /甲的内容/, '折叠分区后条目还在');
+  assert.match(text(), /项目记忆/, '折叠分区后分区标题不该消失');
+  mini.click(mini.findAll(view, byClass('dshmem_sectionHead'))[0]);
+  await settle(8);
+  assert.match(text(), /甲的内容/, '分区没能重新展开');
+
+  /* 全局页签只有一个全局分区，能独立折叠。 */
+  await clickTab('tabGlobal');
+  await settle(10);
+  const globalHead = mini.findAll(view, byClass('dshmem_sectionHead'))[0];
   assert.ok(globalHead, '找不到全局分区头');
   mini.click(globalHead);
   await settle(8);
   assert.doesNotMatch(text(), /空间全局/, '折叠分区后条目还在');
   assert.match(text(), /全局记忆/, '折叠分区后分区标题不该消失');
-  mini.click(mini.findAll(view, byClass('dshmem_sectionHead'))[1]);
+  mini.click(mini.findAll(view, byClass('dshmem_sectionHead'))[0]);
   await settle(8);
   assert.match(text(), /空间全局/, '分区没能重新展开');
 });
@@ -989,11 +1264,11 @@ await test('整合：同标签的记忆合并成一条，原条目自动归档',
   );
 });
 
-await test('档案 / 列表两个视图互切，范围 chip 只留一个分区', async () => {
+await test('档案 / 列表两个视图互切，范围只由页签决定', async () => {
   renderPage('zh');
   await settle(10);
 
-  /* 列表：卡片 + 标签云 + 范围 chip，没有分区，也没有档案页的排布下拉。 */
+  /* 列表：卡片 + 标签云，没有分区，也没有档案页的排布下拉；范围 chip 已并进顶部页签。 */
   mini.click(mini.findByText(view, makeT('zh')('viewList'), 'button'));
   await settle(8);
   assert.equal(mini.findAll(view, byClass('dshmem_section')).length, 0, '列表视图不该再有分区');
@@ -1006,22 +1281,26 @@ await test('档案 / 列表两个视图互切，范围 chip 只留一个分区',
     false,
     '列表视图不该出现档案页的排布下拉',
   );
+  assert.equal(
+    mini.findAll(view, byClass('dshmem_chip_click')).some((node) =>
+      mini.textOf(node).startsWith(makeT('zh')('scopeGlobalFull'))),
+    false,
+    '范围 chip 不该再出现——页签已经承担了范围的切换',
+  );
 
-  const chip = mini
-    .findAll(view, byClass('dshmem_chip_click'))
-    .find((node) => mini.textOf(node).startsWith(makeT('zh')('scopeGlobalFull')));
-  assert.ok(chip, '找不到「全局记忆」范围 chip');
-  mini.click(chip);
+  await clickTab('tabGlobal');
   await settle(12);
+  assert.match(text(), /空间全局/, '全局页的列表里没有全局记忆');
+  assert.doesNotMatch(text(), /端到端测试记忆/, '全局页不该再出现项目记忆');
 
-  /* 切回档案：分区回来了，而且只剩筛中的那一个。 */
+  /* 切回档案：全局分区还在，项目内容不跟过来。 */
   mini.click(mini.findByText(view, makeT('zh')('viewDoc'), 'button'));
   await settle(10);
   const sections = mini.findAll(view, byClass('dshmem_section'));
-  assert.equal(sections.length, 1, '筛到全局后应该只剩一个分区');
+  assert.equal(sections.length, 1, '全局页应该只剩一个分区');
   assert.match(mini.textOf(sections[0]), /全局记忆/);
   assert.ok(mini.textOf(sections[0]).includes('空间全局'), '全局分区里没有全局记忆');
-  assert.doesNotMatch(text(), /端到端测试记忆/, '筛到全局后不该再出现项目记忆');
+  assert.doesNotMatch(text(), /端到端测试记忆/, '全局页不该再出现项目记忆');
 });
 
 /* ---------------- 档案视图：照 WorkBuddy 的「记忆与进化」 ---------------- */
@@ -1042,16 +1321,17 @@ await test('档案视图默认打开：分区小标题 + 粗体标题 + 整段�
   assert.ok(byClass('dshmem_seg_on')(segments[0]), '默认应该选中「档案」');
 
   const sections = mini.findAll(view, byClass('dshmem_sectionTitle'));
-  assert.deepEqual(sections.map((node) => mini.textOf(node)), ['项目记忆', '全局记忆']);
+  assert.deepEqual(sections.map((node) => mini.textOf(node)), ['项目记忆'], '项目页只装项目分区');
 
   const titles = mini.findAll(view, byClass('dshmem_docTitle')).map((node) => mini.textOf(node));
   assert.ok(titles.includes('插件安装方式'), `档案里缺少已有记忆：${titles.join(' | ')}`);
+  assert.ok(!titles.includes('全局偏好'), '全局记忆不该出现在项目页的档案里');
   const paras = mini.findAll(view, byClass('dshmem_docPara')).map((node) => mini.textOf(node));
   assert.ok(paras.some((para) => para.includes('cordis.patch.yml')), '档案里没有整段正文');
 
   /* 卡片、标签云是列表视图的东西；档案视图整篇文档排布下只有分区、标题与正文。 */
   assert.equal(mini.findAll(view, byClass('dshmem_card')).length, 0, '档案视图不该渲染卡片');
-  assert.equal(mini.findAll(view, byClass('dshmem_section')).length, 2, '档案视图应该有项目/全局两个分区');
+  assert.equal(mini.findAll(view, byClass('dshmem_section')).length, 1, '项目页应该只有一个分区');
 
   const body = text();
   assert.match(body, new RegExp(escapeRe(makeT('zh')('manageMemory'))));
@@ -1078,6 +1358,7 @@ await test('整篇编辑：改正文、加条目，文档里消失的归档', as
   assert.ok(area, '点「编辑」没有打开整篇文本框');
   assert.match(area.props.value, /^## 项目记忆$/m);
   assert.match(area.props.value, /\*\*插件安装方式\*\*/);
+  assert.doesNotMatch(area.props.value, /全局偏好/, '项目页的整篇编辑不该带出全局条目');
 
   const kept = 'package 进入 dsh.profile.bundles 后，其 cordis.patch.yml 会被自动应用。';
   mini.type(
@@ -1101,12 +1382,12 @@ await test('整篇编辑：改正文、加条目，文档里消失的归档', as
   );
   assert.equal(
     all.find((record) => record.title === '全局偏好').archived,
-    true,
-    '文档里消失的条目应该被归档（而不是删除）',
+    false,
+    '全局条目不在项目页的文档里，整篇保存不该动它',
   );
   assert.deepEqual(
     all.filter((record) => !record.archived).map((record) => record.title).sort(),
-    ['插件安装方式', '档案新条目'],
+    ['全局偏好', '插件安装方式', '档案新条目', '空间全局'],
   );
   assert.match(text(), new RegExp(escapeRe(makeT('zh')('docSaved').slice(0, 4))));
 });
@@ -1311,17 +1592,6 @@ await test('后端出错时页面显示错误而不是白屏', async () => {
 });
 
 /* ---------------- v0.3.3：变化横幅 / 注入预览 / 时间线排布 / 维护页 ---------------- */
-
-/** tab 按钮可能带数量徽标（如「维护 2」），用 includes 而不是全等。 */
-const clickTab = async (key, locale = 'zh') => {
-  const label = makeT(locale)(key);
-  const button = mini
-    .findAll(view, (node) => node.type === 'button' && mini.textOf(node).includes(label))
-    .find((node) => mini.textOf(node).trim().startsWith(label));
-  assert.ok(button, `找不到 tab：${label}`);
-  mini.click(button);
-  await settle(8);
-};
 
 await test('记忆库顶部：变化横幅 + 注入预览（/briefing-preview 被调用，简报条目带标记）', async () => {
   await api.handle({
@@ -1588,6 +1858,66 @@ await test('维护页：Dream 画像不可用时跳过，真实失败显示明�
   }
 });
 
+await test('维护页：二级蒸馏卡显示上次素材 / 拒绝原因 / 自适应节奏', async () => {
+  store.noteGlobalDistill(WS, {
+    lastAt: '2026-11-07T15:30:00.000Z',
+    lastSource: 'auto',
+    lastResult: 'no_candidate',
+    lastReason: 'all_rejected',
+    lastMaterials: 7,
+    lastParsed: 2,
+    lastAdded: 0,
+    lastRejects: { 'few-anchors': 1, 'no-topics': 1 },
+    lastExcerpt: '模型原文示例',
+    attempts: 3,
+    misses: 2,
+    emptyStreak: 2,
+  });
+  try {
+    renderPage('zh');
+    await settle(10);
+    await clickTab('tabMaintain');
+    await settle(8);
+
+    const body = text();
+    assert.match(body, /上次二级蒸馏：/);
+    assert.match(body, /素材 7 条/);
+    assert.match(body, /解析 2 条/);
+    assert.match(body, /候选都被准入挡掉/, '空产出原因要能看懂');
+    assert.match(body, /few-anchors×1/, '拒绝原因要显示计数');
+    assert.match(body, /节奏：基础 15 分钟/, '要显示自适应节奏（连续空跑 2 次 → 退避）');
+    assert.match(body, /模型原文示例/, '脱敏摘要要能展开排查');
+
+    store.noteGlobalDistill(WS, {
+      lastResult: 'duplicate',
+      lastReason: 'duplicate',
+      lastAdded: 0,
+      lastSkipped: 1,
+      emptyStreak: 1,
+      lastExcerpt: '',
+    });
+    renderPage('zh');
+    await settle(10);
+    await clickTab('tabMaintain');
+    await settle(8);
+    assert.match(text(), /都已在候选池里/, '重复表述要有单独说明，不能显示成「模型没产出」');
+  } finally {
+    store.noteGlobalDistill(WS, {
+      lastAt: null,
+      lastResult: null,
+      lastReason: null,
+      lastMaterials: 0,
+      lastParsed: 0,
+      lastAdded: 0,
+      lastRejects: {},
+      lastExcerpt: '',
+      attempts: 0,
+      misses: 0,
+      emptyStreak: 0,
+    });
+  }
+});
+
 await test('维护页：Dream 只报告矛盾，确认后才按时序归档', async () => {
   const dir = fs.mkdtempSync(path.join(tmp, 'client-time-order-'));
   const s = createMemoryStore({ dir, mirror: false });
@@ -1716,6 +2046,7 @@ await test('画像卡：段落带证据标签，没有证据的段标「未溯�
 
   renderPage('zh');
   await settle(8);
+  await openGlobalTab();
 
   const body = text();
   assert.match(body, new RegExp(escapeRe(makeT('zh')('portraitGlobalLabel'))), '应有全局画像块');
@@ -1745,6 +2076,7 @@ await test('画像依据下钻：点证据标签显示来源原文', async () =>
   });
   renderPage('zh');
   await settle(10);
+  await openGlobalTab();
   const chip = mini.findAll(
     view,
     (node) =>
@@ -1852,6 +2184,7 @@ await test('画像卡：只渲染全局画像块（工作区画像不再出现�
   fetchCalls.length = 0;
   renderPage('zh');
   await settle(8);
+  await openGlobalTab();
 
   /* 外层「画像」标题已删（与子块「全局画像」重复命名），改断言工具行按钮在场。 */
   assert.ok(mini.findByText(view, makeT('zh')('portraitRewrite'), 'button'), '缺少画像工具行按钮');
@@ -1928,6 +2261,7 @@ await test('画像逐段编辑：只更新当前段，其他段不动', async ()
   });
   renderPage('zh');
   await settle(10);
+  await openGlobalTab();
 
   const section = mini.findAll(
     view,
@@ -1970,6 +2304,7 @@ await test('画像卡：这次变了什么——拉 /portrait/diff 并渲染 +/-
   fetchCalls.length = 0;
   renderPage('zh');
   await settle(8);
+  await openGlobalTab();
 
   const diffBtn = mini.findByText(view, makeT('zh')('portraitDiff'), 'button');
   assert.ok(diffBtn, '缺少「这次变了什么」按钮');
@@ -1990,6 +2325,8 @@ await test('画像卡：这次变了什么——拉 /portrait/diff 并渲染 +/-
 await test('红线专用编辑器：新增、逐字预览、编辑', async () => {
   renderPage('zh');
   await settle(10);
+  await clickTab('tabRedline');
+  await settle(8);
   mini.click(mini.findByText(view, makeT('zh')('redlineAdd'), 'button'));
   await settle(6);
 
@@ -2077,6 +2414,8 @@ await test('红线冲突提示：命中后不静默保存，确认后才落库',
   ).record;
   renderPage('zh');
   await settle(10);
+  await clickTab('tabRedline');
+  await settle(8);
   mini.click(mini.findByText(view, makeT('zh')('redlineAdd'), 'button'));
   await settle(6);
   const titleInput = mini
@@ -2115,19 +2454,32 @@ await test('红线冲突提示：命中后不静默保存，确认后才落库',
   }
 });
 
-await test('红线卡：置顶渲染，解除走 overrideRedline 确认通道', async () => {
+await test('红线在独立页签：只放红线、画像留在全局页，解除走 overrideRedline 确认通道', async () => {
   store.upsert(
     { title: '绝不 force push', content: '禁止对受保护分支 force push。', category: 'constraint', source: 'agent' },
     { workspace: WS },
   );
   renderPage('zh');
   await settle(8);
+  await clickTab('tabRedline');
+  await settle(8);
 
   const body = text();
-  assert.match(body, new RegExp(escapeRe(makeT('zh')('redlineTitle'))), '红线卡应在画像之上');
+  const redlineTitleRe = new RegExp(escapeRe(makeT('zh')('redlineTitle')));
+  const portraitTitleRe = new RegExp(escapeRe(makeT('zh')('portraitTitle')));
+  assert.match(body, redlineTitleRe, '红线页签应渲染红线卡');
   assert.match(body, /绝不 force push/, '红线条目标题应显示');
+  assert.doesNotMatch(body, portraitTitleRe, '红线页签只放红线，画像不该跟过来');
 
-  /* 解除：确认后 /delete 必须带 overrideRedline（模型没有这条通道，仅面板有）。 */
+  /* 全局页只放画像：红线不再混在全局页里。 */
+  await clickTab('tabGlobal');
+  await settle(8);
+  assert.match(text(), portraitTitleRe, '全局页应渲染画像');
+  assert.doesNotMatch(text(), redlineTitleRe, '红线不该出现在全局页');
+
+  /* 回到红线页再解除：确认后 /delete 必须带 overrideRedline（模型没有这条通道，仅面板有）。 */
+  await clickTab('tabRedline');
+  await settle(8);
   confirmAnswer = true;
   const liftBtn = mini.findByText(view, makeT('zh')('redlineRemove'), 'button');
   assert.ok(liftBtn, '缺少解除按钮');
@@ -2154,6 +2506,7 @@ await test('画像卡：全局画像缺失时显示空态引导（工作区画�
   walk(tmp);
   renderPage('zh');
   await settle(8);
+  await openGlobalTab();
 
   const body = text();
   assert.match(body, new RegExp(escapeRe(makeT('zh')('portraitWorkspaceEmptyHint'))), '全局画像缺失时应显示空态引导');
@@ -2164,6 +2517,7 @@ await test('画像卡：重写按钮触发 /portrait/rewrite（scope=global）�
   fetchCalls.length = 0;
   renderPage('zh');
   await settle(8);
+  await openGlobalTab();
   const rewrite = mini.findByText(view, makeT('zh')('portraitRewrite'), 'button');
   assert.ok(rewrite, '缺少重写按钮');
   mini.click(rewrite);
@@ -2185,6 +2539,35 @@ await test('画像卡：重写按钮触发 /portrait/rewrite（scope=global）�
   );
 });
 
+await test('画像卡：重写失败时把 detail 一起显示（不是只剩一个错误码）', async () => {
+  const failApi = createApi({
+    store,
+    settings,
+    activeWorkspace: () => WS,
+    listWorkspaces: () => [{ root: WS, key: 'k', count: 0, active: true }],
+    rewriteNow: async () => ({
+      ok: false,
+      error: 'no_model_route',
+      detail: '没有可用的模型路由：先在 DSH 里选好模型再重试',
+    }),
+  });
+  activeApi = failApi;
+  try {
+    renderPage('zh');
+    await settle(8);
+    await openGlobalTab();
+    const rewrite = mini.findByText(view, makeT('zh')('portraitRewrite'), 'button');
+    assert.ok(rewrite, '缺少重写按钮');
+    mini.click(rewrite);
+    await settle(14);
+    const body = text();
+    assert.match(body, /no_model_route/, '错误码仍应保留，方便排查');
+    assert.match(body, /没有可用的模型路由：先在 DSH 里选好模型再重试/, 'detail 是字符串时也要显示');
+  } finally {
+    activeApi = api;
+  }
+});
+
 await test('画像卡：待审重写稿——预览与批准（全局）', async () => {
   store.portraitDraftWrite('', {
     sections: [{ key: 'background', text: '待审背景。' }],
@@ -2193,6 +2576,7 @@ await test('画像卡：待审重写稿——预览与批准（全局）', async
   fetchCalls.length = 0;
   renderPage('zh');
   await settle(8);
+  await openGlobalTab();
   assert.match(text(), new RegExp(escapeRe(makeT('zh')('portraitDraftHint'))), '应有待审提示');
 
   const preview = mini.findByText(view, makeT('zh')('portraitDraftView'), 'button');
@@ -2502,40 +2886,65 @@ await test('前台会话卡：收起为胶囊，展开后只显示本会话已�
   storage.delete('dsh-memory/session-hud/open');
   sessionNodes.length = 0;
   sessionNodes.push(conversationNode('s-hud'));
+  /* 外观走宿主配置：宽度 / 固定高度 / 不透明度 / 背景色都应原样落到卡片上。 */
+  settingsValue.hudWidth = 420;
+  settingsValue.hudHeight = 300;
+  settingsValue.hudOpacity = 0.6;
+  settingsValue.hudColor = '#101828';
   const hud = slotRegistrations.get('shell.overlay');
   const hudHandle = mini.render(mini.react.createElement(hud.component, { t: makeT('zh') }));
-  await settle(12);
+  try {
+    await settle(12);
 
-  const pills = nodesByClass(hudHandle.tree, 'dshmem_hud_pill');
-  assert.equal(pills.length, 1, '有会话时应渲染记忆胶囊');
-  assert.match(mini.textOf(pills[0]), /会话记忆/, '胶囊应带标题');
-  mini.click(pills[0]);
-  await settle(12);
+    const pills = nodesByClass(hudHandle.tree, 'dshmem_hud_pill');
+    assert.equal(pills.length, 1, '有会话时应渲染记忆胶囊');
+    assert.match(mini.textOf(pills[0]), /会话记忆/, '胶囊应带标题');
+    const pillWrap = nodesByClass(hudHandle.tree, 'dshmem_hud')[0];
+    assert.equal(String(pillWrap?.props?.style?.width || ''), '', '胶囊不该被卡片宽度撑开');
+    assert.equal(pillWrap?.props?.style?.['--dshmem-hud-bg'], '#101828', '胶囊应带上自定义底色');
+    assert.equal(pillWrap?.props?.style?.['--dshmem-hud-bg-alpha'], '60%', '胶囊应带上背景不透明度');
+    mini.click(pills[0]);
+    await settle(12);
 
-  const card = nodesByClass(hudHandle.tree, 'dshmem_hud_card')[0];
-  assert.ok(card, '点击胶囊后应展开卡片');
-  const body = mini.textOf(card);
-  assert.match(body, /本会话记住了 1 条/, '摘要应以条数开头');
-  assert.match(body, /会话卡已沉淀/, '缺少本会话已沉淀记忆');
-  assert.match(body, /更新于 \d{4}-\d{2}-\d{2} \d{2}:\d{2}/, '应显示完整更新时间');
-  assert.doesNotMatch(body, /帮我把设置面板的悬浮卡做出来/, '诉求列表不应再出现在卡片里');
-  assert.doesNotMatch(body, /会话卡草稿/, '草稿不应出现在前台卡');
-  assert.doesNotMatch(body, /别的会话记忆/, '其它会话的记忆不应出现');
+    const card = nodesByClass(hudHandle.tree, 'dshmem_hud_card')[0];
+    assert.ok(card, '点击胶囊后应展开卡片');
+    assert.equal(card.props.style.width, '420px', '卡片宽度应跟随设置');
+    assert.equal(card.props.style.height, '300px', '固定高度应跟随设置');
+    assert.equal(card.props['data-size'], 'fixed', '固定高度应打开内部滚动布局');
+    assert.equal(card.props['data-translucent'], '1', '调过透明度后应打开混色模式');
+    assert.equal(card.props.style['--dshmem-hud-bg-alpha'], '60%', '不透明度应写成背景透明度');
+    assert.equal(card.props.style['--dshmem-hud-bg'], '#101828', '背景色应跟随设置');
+    assert.equal(card.props.style['--dshmem-hud-fg'], '#f5f7fb', '深色底应自动换成浅色文字');
+    assert.equal(nodesByClass(card, 'dshmem_hud_resize').length, 1, '缺少右下角缩放把手');
 
-  const glyph = nodesByClass(card, 'dshmem_hud_glyph')[0];
-  assert.ok(glyph, '缺少会话卡图标');
-  assert.match(
-    String(glyph.props.style?.backgroundImage || ''),
-    /^url\("data:image\/svg\+xml/,
-    '默认图标应是官方鲸鱼矢量',
-  );
+    const body = mini.textOf(card);
+    assert.match(body, /本会话记住了 1 条/, '摘要应以条数开头');
+    assert.match(body, /会话卡已沉淀/, '缺少本会话已沉淀记忆');
+    assert.match(body, /更新于 \d{4}-\d{2}-\d{2} \d{2}:\d{2}/, '应显示完整更新时间');
+    assert.doesNotMatch(body, /帮我把设置面板的悬浮卡做出来/, '诉求列表不应再出现在卡片里');
+    assert.doesNotMatch(body, /会话卡草稿/, '草稿不应出现在前台卡');
+    assert.doesNotMatch(body, /别的会话记忆/, '其它会话的记忆不应出现');
 
-  const close = nodesByClass(hudHandle.tree, 'dshmem_hud_iconbtn').find((button) => mini.textOf(button) === '×');
-  assert.ok(close, '缺少收起按钮');
-  mini.click(close);
-  await settle(6);
-  assert.equal(nodesByClass(hudHandle.tree, 'dshmem_hud_card').length, 0, '收起后不应保留卡片');
-  assert.equal(nodesByClass(hudHandle.tree, 'dshmem_hud_pill').length, 1, '收起后应回到胶囊');
+    const glyph = nodesByClass(card, 'dshmem_hud_glyph')[0];
+    assert.ok(glyph, '缺少会话卡图标');
+    assert.match(
+      String(glyph.props.style?.backgroundImage || ''),
+      /^url\("data:image\/svg\+xml/,
+      '默认图标应是官方鲸鱼矢量',
+    );
+
+    const close = nodesByClass(hudHandle.tree, 'dshmem_hud_iconbtn').find((button) => mini.textOf(button) === '×');
+    assert.ok(close, '缺少收起按钮');
+    mini.click(close);
+    await settle(6);
+    assert.equal(nodesByClass(hudHandle.tree, 'dshmem_hud_card').length, 0, '收起后不应保留卡片');
+    assert.equal(nodesByClass(hudHandle.tree, 'dshmem_hud_pill').length, 1, '收起后应回到胶囊');
+  } finally {
+    settingsValue.hudWidth = 340;
+    settingsValue.hudHeight = 0;
+    settingsValue.hudOpacity = 1;
+    settingsValue.hudColor = '';
+  }
 });
 
 await test('前台会话卡：切换对话后只显示新会话', async () => {

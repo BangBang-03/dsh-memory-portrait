@@ -244,7 +244,7 @@ const { GLOBAL_DISTILL_SYSTEM, parseGlobalDistill } = mod;
 test('解析：正常 JSON 数组解析出候选，category 与 topics 保留', () => {
   const reply = JSON.stringify([
     { text: '对外素材一律使用构造数据并标注来源', category: 'feedback', topics: ['privacy'], anchors: ['m1', 'm2'] },
-    { text: '后台任务不阻塞主流程，失败要冷却', category: 'decision', topics: ['non-blocking'], anchors: ['m3'] },
+    { text: '后台任务不阻塞主流程，失败要冷却', category: 'decision', topics: ['non-blocking'], anchors: ['m3', 'm4'] },
   ]);
   const items = parseGlobalDistill(reply);
   assert.equal(items.length, 2);
@@ -282,7 +282,7 @@ test('解析：非法 category 回落 convention，超量截断到 3 条', () =>
       text: `第${i}条原则示例，内容足够长可以过长度检查`,
       category: 'nonsense',
       topics: [`topic${i}`],
-      anchors: ['m1'],
+      anchors: ['m1', 'm2'],
     })),
   );
   const items = parseGlobalDistill(reply);
@@ -298,10 +298,105 @@ test('解析：坏 JSON 返回空数组，不抛错', () => {
 
 test('提示词：包含三类禁止与 topics 约束', () => {
   assert.match(GLOBAL_DISTILL_SYSTEM, /项目载体/);
-  assert.match(GLOBAL_DISTILL_SYSTEM, /只有一个锚点/);
+  assert.match(GLOBAL_DISTILL_SYSTEM, /锚点/);
+  assert.match(GLOBAL_DISTILL_SYSTEM, /constraint \/ feedback：至少 1 个锚点/, 'feedback/constraint 单锚即可');
+  assert.match(GLOBAL_DISTILL_SYSTEM, /preference \/ decision：至少 2 个锚点/);
   assert.match(GLOBAL_DISTILL_SYSTEM, /常识套话/);
   assert.match(GLOBAL_DISTILL_SYSTEM, /topics/);
   assert.match(GLOBAL_DISTILL_SYSTEM, /0–3 条/);
+});
+
+/* ---------------- 诊断：为什么没产出 ---------------- */
+
+const { analyzeGlobalDistill, ANCHOR_MINIMUMS } = mod;
+
+test('诊断：模型回 [] 归成 empty，能看出是「模型觉得没有」', () => {
+  const { items, stats } = analyzeGlobalDistill('[]');
+  assert.equal(items.length, 0);
+  assert.equal(stats.format, 'array');
+  assert.equal(stats.parsed, 0);
+  assert.equal(stats.accepted, 0);
+  assert.deepEqual(stats.rejected, {});
+});
+
+test('诊断：坏 JSON / 纯文本 / 非数组分别归类，不再都是 no_candidate', () => {
+  assert.equal(analyzeGlobalDistill('模型今天不想干活').stats.format, 'none');
+  assert.equal(analyzeGlobalDistill('[{"text":').stats.format, 'bad_json');
+  /* 取第一个 [ 到最后一个 ] 的切片本来就能把 {"principles":[...]} 的内层数组捞出来。 */
+  const object = analyzeGlobalDistill(JSON.stringify({ principles: [] })).stats;
+  assert.equal(object.format, 'array', '对象包一层数组也要认');
+  assert.equal(object.parsed, 0);
+  const badObject = analyzeGlobalDistill(JSON.stringify({ note: 'no array' })).stats;
+  assert.equal(badObject.format, 'not_array');
+});
+
+test('诊断：拒绝原因按条计数，能区分载体 / 缺主题 / 锚点不够', () => {
+  const reply = JSON.stringify([
+    { text: '发布前跑 node test/run-all.mjs 检查', category: 'feedback', topics: ['release'], anchors: ['m1'] },
+    { text: '这是一条没有主题词的原则', category: 'feedback', topics: [], anchors: ['m2'] },
+    { text: '这是一条 preference 但只有一个锚点', category: 'preference', topics: ['pref'], anchors: ['m3'] },
+    { text: '这条 feedback 只有一个锚点也应该保留', category: 'feedback', topics: ['fb'], anchors: ['m4'] },
+  ]);
+  const { items, stats } = analyzeGlobalDistill(reply);
+  assert.equal(stats.parsed, 4);
+  assert.equal(stats.accepted, 1);
+  assert.equal(items[0].category, 'feedback');
+  assert.equal(
+    (stats.rejected['carries-command'] || 0) + (stats.rejected['carries-filename'] || 0),
+    1,
+    '项目载体要单独计数',
+  );
+  assert.equal(stats.rejected['no-topics'], 1);
+  assert.equal(stats.rejected['few-anchors'], 1);
+});
+
+test('诊断：锚点底线按类别分层（feedback 1 / decision 2）', () => {
+  assert.equal(ANCHOR_MINIMUMS.feedback, 1);
+  assert.equal(ANCHOR_MINIMUMS.constraint, 1);
+  assert.equal(ANCHOR_MINIMUMS.decision, 2);
+  const reply = JSON.stringify([
+    { text: '这条 decision 只有一个锚点会被挡掉', category: 'decision', topics: ['d'], anchors: ['m1'] },
+    { text: '这条 decision 有两个锚点可以保留', category: 'decision', topics: ['d'], anchors: ['m2', 'm3'] },
+  ]);
+  const { items, stats } = analyzeGlobalDistill(reply);
+  assert.equal(stats.rejected['few-anchors'], 1);
+  assert.equal(items.length, 1);
+});
+
+/* ---------------- 自适应节奏与素材闸 ---------------- */
+
+const { distillCadence, distillDue } = mod;
+
+test('节奏：基础间隔随连续空跑翻倍，上限 24 小时', () => {
+  assert.equal(distillCadence({ emptyStreak: 0 }).intervalMinutes, 15);
+  assert.equal(distillCadence({ emptyStreak: 1 }).intervalMinutes, 30);
+  assert.equal(distillCadence({ emptyStreak: 2 }).intervalMinutes, 60);
+  assert.equal(distillCadence({ emptyStreak: 10 }).intervalMinutes, 24 * 60);
+  assert.equal(
+    distillCadence({ emptyStreak: 0 }, { cooldownMinutes: 5 }).intervalMinutes,
+    5,
+    '基础间隔可配置',
+  );
+});
+
+test('素材闸：未覆盖达到门槛才触发；用户亲口说的可以提前触发', () => {
+  const materials = Array.from({ length: 4 }, (_, i) => ({ id: `m${i}`, category: 'decision' }));
+  assert.equal(distillDue({ materials, candidates: [], project: 'p', minNew: 5 }).due, false);
+  assert.equal(distillDue({ materials, candidates: [], project: 'p', minNew: 3 }).due, true, '存量素材也能触发');
+
+  const user = [{ id: 'u1', category: 'feedback' }, { id: 'u2', category: 'preference' }];
+  const gate = distillDue({ materials: user, candidates: [], project: 'p', minNew: 5 });
+  assert.equal(gate.due, true, '两条用户证据可以越过总素材门槛');
+  assert.equal(gate.userEvidence, 2);
+
+  const covered = distillDue({
+    materials,
+    candidates: [{ project: 'p', anchors: ['m0', 'm1'] }],
+    project: 'p',
+    minNew: 3,
+  });
+  assert.equal(covered.uncovered, 2, '被候选引用过的不再算新素材');
+  assert.equal(covered.due, false);
 });
 
 /* ---------------- 集成：候选池 → Dream 巡检 → 全局记忆 ---------------- */

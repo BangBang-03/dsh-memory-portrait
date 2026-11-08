@@ -50,10 +50,11 @@ const KNOWN_WORKSPACES = [
   path.join(tmp, 'ws-health-extra'),
   path.join(tmp, 'ws-full-export'),
   path.join(tmp, 'ws-full-import'),
+  path.join(tmp, 'ws-overview'),
 ];
 
 const store = createMemoryStore({ dir: path.join(tmp, 'storage') });
-let settingsValue = { enabled: true, briefing: true, briefMode: 'index', briefingLimit: 12, briefingMaxChars: 2000, autoCapture: true, briefingBudget: 12, hudIcon: 'a' };
+let settingsValue = { enabled: true, briefing: true, briefMode: 'index', briefingLimit: 12, briefingMaxChars: 2000, autoCapture: true, briefingBudget: 12, hudIcon: 'a', hudWidth: 340, hudHeight: 0, hudOpacity: 1, hudColor: '' };
 const settings = {
   get: () => ({ ...settingsValue }),
   set(patch) {
@@ -1116,6 +1117,24 @@ await test('GET /session-brief：只返回本会话的诉求与已沉淀记忆�
   assert.equal(res.body.records[0].title, '本会话已沉淀');
   assert.ok(res.body.updatedAt, '应给出最新时间');
   assert.equal(res.body.icon, 'a', '默认图标为官方鲸鱼标');
+  assert.deepEqual(
+    res.body.hud,
+    { width: 340, height: 0, opacity: 1, color: '' },
+    '默认外观应随会话摘要返回（宽度 / 自适应高度 / 不透明 / 跟随主题）',
+  );
+
+  await call('POST', '/settings', {
+    body: { settings: { hudWidth: 420, hudHeight: 300, hudOpacity: 0.6, hudColor: '#101828' } },
+  });
+  const styled = await call('GET', '/session-brief', { query: { session: 's-brief-1' } });
+  assert.deepEqual(
+    styled.body.hud,
+    { width: 420, height: 300, opacity: 0.6, color: '#101828' },
+    '设置里的外观应随会话摘要返回',
+  );
+  await call('POST', '/settings', {
+    body: { settings: { hudWidth: 340, hudHeight: 0, hudOpacity: 1, hudColor: '' } },
+  });
 
   await call('POST', '/settings', { body: { settings: { hudIcon: 'f' } } });
   const withIcon = await call('GET', '/session-brief', { query: { session: 's-brief-1' } });
@@ -1526,6 +1545,44 @@ await test('候选池：POST /candidates/reject 一次点击即标记，不需�
 await test('候选池：空 ids 返回 400，不静默成功', async () => {
   const res = await call('POST', '/candidates/reject', { body: { ids: [] } });
   assert.equal(res.status, 400);
+});
+
+/* ---------------- /overview：面板概览的聚合口径 ---------------- */
+
+await test('GET /overview 聚合计数 / 类别 / 趋势 / 画像覆盖', async () => {
+  /* 独立工作区：项目计数可控；全局计数会被前面的用例影响，所以用 stats 对比而不是写死。 */
+  const w = path.join(tmp, 'ws-overview');
+  await call('POST', '/save', { body: { workspace: w, title: '概览甲', content: '项目甲。', category: 'fact', tags: ['ov'] } });
+  await call('POST', '/save', { body: { workspace: w, title: '概览乙', content: '项目乙。', category: 'preference' } });
+  await call('POST', '/save', { body: { workspace: w, title: '概览红线', content: '绝不删生产库。', category: 'constraint' } });
+  await call('POST', '/save', { body: { workspace: w, title: '概览全局', content: '全局一条。', category: 'fact', scope: 'global', tags: ['ov'] } });
+  store.upsert({ title: '概览草稿', content: '草稿正文。', status: 'draft', source: 'auto' }, { workspace: w });
+  store.savePortrait('', {
+    sections: [{ key: 'background', text: '概览画像背景。' }, { key: 'focus', text: '' }],
+    source: 'manual',
+  });
+
+  const before = store.stats({ workspace: w });
+  const res = await call('GET', '/overview', { query: { workspace: w } });
+  assert.equal(res.status, 200);
+  const ov = res.body.overview;
+  assert.equal(ov.workspace, path.resolve(w));
+  assert.equal(ov.days, 7);
+  assert.equal(ov.counts.project, before.total);
+  assert.equal(ov.counts.global, before.global);
+  assert.equal(ov.counts.drafts, before.drafts);
+  assert.equal(ov.counts.redlines, 1, '红线只数 active constraint');
+  assert.equal(
+    ov.categories.reduce((n, item) => n + item.count, 0),
+    before.total + before.global,
+    '类别分布应覆盖项目 + 全局的 active 条目',
+  );
+  assert.ok(ov.categories[0].count >= ov.categories[ov.categories.length - 1].count, '类别按数量降序');
+  assert.equal(ov.trend.length, 7);
+  assert.ok(ov.trend[6].count >= 4, '今天的趋势应包含刚写入的项目 + 全局条目');
+  assert.ok(ov.portrait && ov.portrait.filled >= 1, '画像覆盖应报出有内容的段');
+  assert.ok(ov.portrait.total >= ov.portrait.filled);
+  assert.equal(typeof ov.portrait.version, 'number');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
