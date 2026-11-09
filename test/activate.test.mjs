@@ -470,6 +470,30 @@ await test('webServer 路由：面板改设置会真的作用到工具行为', a
   assert.match((await tool.execute({ action: 'stats' }, exec)).text, /本工作区 0 条/);
 });
 
+await test('前台卡判定：/session-brief 的 started 跟着会话转录走（开局 false，说过话才 true）', async () => {
+  const { calls, route } = activate();
+  const onCreated = calls.events.find(([name]) => name === 'session/created')[1];
+  /* 开局：DSH 已经把会话建好，但一条消息都没有（空白对话页就是这种）。 */
+  const messages = [];
+  const session = {
+    id: 'hud-blank',
+    header: { cwd: workspace },
+    requestHeader: () => ({ config: { provider: 'deepseek-account', model: 'deepseek-flash' } }),
+    deriveMessages: () => messages,
+  };
+  onCreated(session);
+
+  const blank = await callRoute(route, { url: '/memory/api/session-brief?session=hud-blank' });
+  assert.equal(blank.status, 200);
+  assert.equal(blank.body.started, false, '开局空白会话不能算已开始（前台卡不显示）');
+
+  /* 首条用户消息一进来就该算开始：这时轮末索引还没落盘，只能靠宿主看转录。 */
+  messages.push({ role: 'user', content: [{ type: 'text', text: '帮我把开局就弹出来的悬浮窗改成说过话之后再出现' }] });
+  const talking = await callRoute(route, { url: '/memory/api/session-brief?session=hud-blank' });
+  assert.equal(talking.body.started, true, '说过话之后应算已开始（前台卡显示）');
+  assert.equal(talking.body.entries.length, 0, '此时会话索引还是空的，started 只能由宿主转录判定');
+});
+
 await test('webServer 路由守好边界：非本插件路径 404、不可信来源 403', async () => {
   const { route } = activate();
 

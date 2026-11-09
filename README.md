@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![npm](https://img.shields.io/npm/v/@bangbang-03/dsh-memory?color=4d6bfe&label=npm)](https://www.npmjs.com/package/@bangbang-03/dsh-memory)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-701%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-704%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 **DSH 的记忆画像：不是记住更多，而是让你看见它怎么理解你。**<br>
 **Long-term memory for DeepSeek Harness, with a portrait you can inspect.**
@@ -100,7 +100,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | 自动提炼 | 轮次结束（可选） | 结构化记忆；默认 `direct` 全自动，`review` 只把高风险候选送审批，`draft` 严格全部进队列 |
 | 二级蒸馏 | 模型判断；素材攒够 3 条（用户亲口说的 2 条即可） | 把本项目的教训抽成**跨项目**原则：`constraint` / `feedback` / `preference` 是用户亲口说的，单项目即可晋升；`decision` / `convention` 是推断出来的，要第二个项目交叉验证。够格的自动升为全局记忆。节奏自适应：连续空跑 15m → 30m → 1h … 最多 24h；重复表述（候选池里已有）也算没有进展，不会每 15 分钟重跑；维护页能看上次素材数、解析数、拒绝原因与下次窗口 |
 | Dream / 画像 | 启动 + 轮末到期检查 | 合并重复簇、复审自动续期、报告过期、全局原则晋升判定；画像按 6 小时自动刷新（零审批，直接落库、可回滚）。手动整理才做一次语义裁决，且只决定「这一簇要不要合并」，不自动归档 |
-| 前台会话卡 | 仅当前对话（可收起） | 右下角悬浮卡：图标 + 标题 + 「更新于 YYYY-MM-DD HH:MM」+ 一段话摘要（本会话沉淀的记忆标题连成一句，草稿不可见），空库时给「还没有沉淀 + 聊几句后会出现」两行提示；图标在设置里可选 7 种、大小 14–40px 可调（设置页带实时预览，只落本机），默认官方鲸鱼标；顶部左侧有六点拖动柄，按住整块即可拖走卡片，位置本地记住；切到设置 / 插件 / 自动化任务页自动隐藏，切对话自动换摘要；设置 → 记忆可用「该对话记忆」单独关闭本对话 |
+| 前台会话卡 | 仅当前对话（可收起） | **开局不显示**：会话里还没有真实用户消息（DSH 新建的空白会话）时整卡隐藏，发出首条用户消息后 1s 内自动出现，之后走常规节奏；右下角悬浮卡：图标 + 标题 + 「更新于 YYYY-MM-DD HH:MM」+ 一段话摘要（本会话沉淀的记忆标题连成一句，草稿不可见），空库时给「还没有沉淀 + 聊几句后会出现」两行提示；图标在设置里可选 7 种、大小 14–40px 可调（设置页带实时预览，只落本机），默认官方鲸鱼标；顶部左侧有六点拖动柄，按住整块即可拖走卡片，位置本地记住；切到设置 / 插件 / 自动化任务页自动隐藏，切对话自动换摘要；设置 → 记忆可用「该对话记忆」单独关闭本对话 |
 
 简报的排序不读 `useCount` / 当前时间，日期戳只用 `createdAt`，并且**会话级冻结**。这样同一会话的系统提示不会逐轮变化，前缀缓存不会因为记忆更新而整段作废。
 
@@ -241,7 +241,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 复审到期自动续期（连两轮零引用才升级）+ 自动路径不扫矛盾、手动整理才产出只读线索 + 报告过期未用 + 二级蒸馏与全局原则晋升 + 画像重写（默认直接落库）。手动整理另做**一次**打包语义裁决（`lib/adjudicate.js`）：只有判 `duplicate` 的簇才合并，判 `contradicts` 必须给出同一主谓宾的互斥取值与分落两条的证据，否则强制回落 `unrelated`；无模型路由时静默跳过 |
 | POST | `/candidates/reject` | 「不再提议」：把候选原则标成 rejected，之后同主题不再晋升。`{ ids, reason? }`。自动路径不弹确认，纠错就靠这一个动作 |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
-| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + `hudIcon` 图标键 + `hud` 外观（`width` / `height` / `opacity` / `color`；卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
+| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + `hudIcon` 图标键 + `hud` 外观（`width` / `height` / `opacity` / `color`；卡片只展示记忆摘要；草稿与归档不可见）+ `started`（该会话是否已有真实用户发言；`false` 时前台卡不渲染，开局空白会话就是这种）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
 | GET | `/injections` | 注入审计：最近真正进 prompt 的内容（正文预览 + sha256 前 16 位 + id 列表 + 被挤掉的条目；`full=1` 给原文，`kind` 可过滤） |
 | GET | `/derivations` | 跨层派生链：每层派生了什么、源现在还成不成立（`state` 为 `fresh` / `dirty`，带失效原因） |
 | GET | `/reviews` | 复审队列：带失效条件、到期该复查的记忆（`due` / `soon`） |
@@ -282,7 +282,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 ## 测试
 
 ```powershell
-npm test   # 15 个套件 / 701 项断言
+npm test   # 15 个套件 / 704 项断言
 ```
 
 - 检索：54 条记忆 × 60 条查询硬评测，Recall@5 1.000、MRR@10 0.930（自测口径，见 [评测说明](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/retrieval-eval-2026-10-20.md)）。

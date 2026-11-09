@@ -55,7 +55,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | **P3** | git 与 REST 两条推送通道**不要混用** | REST 重建的提交时区归一成 `+0000`，同树不同 SHA，混推就是分叉 |
 | **P4** | 改 `~/.dsh/profiles/**` 前必须备份（`install.ps1` 自带秒级时间戳备份，手工改也要先备份） | 把用户的 DSH 装坏且无从回滚 |
 | **P5** | 卸载 / 替换只动 junction 与清单项；碰到同名**真实目录**直接报错退出，不许 `Remove-Item -Recurse` | PowerShell 5.1 会跟进 junction 删到共享的 `@deepseek-ai/*`（脚本里已专门防这一步） |
-| **P6** | 改完跑 `node test/run-all.mjs`（15 套件 / 701 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
+| **P6** | 改完跑 `node test/run-all.mjs`（15 套件 / 704 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
 | **P7** | 不加运行时依赖：`dependencies` 保持空，`peerDependencies` 全 optional，`lib/*.js` 只许 import `node:*` 与相对路径 | 插件要在用户机器上零安装；加依赖等于要求所有人重装 |
 | **P8** | 正式版只在 `main` 打 `v*` 标签，且 `package.json` 不许是预发布号（`-lab.N` / `-rc.N` 等）；打标签前 `main` 必须已推送并通过测试；不手改远端保护设置 | 标签挂在旧提交上，`/releases/latest` 发出去的就是旧代码；预发布号漏上去再也升不回来。完整步骤与验收见 `skills/release/SKILL.md` |
 
@@ -75,7 +75,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 模型输入的对话摘录（过滤召回块 / 当前轮判定 / 单条超长截断） | `lib/distill.js` 的 `isInjectedContext` / `selectTranscript` / `shouldDistill` | `lib/index.js` 的 `lastUserText` / `lastAssistantText` / `portraitTranscript` | `distill` + `activate` |
 | HTTP 端点、错误码、参数校验 | `lib/api.js` | README「HTTP 契约」表 | `api` |
 | 设置面板 UI（五个 tab：项目记忆 / 全局记忆 / 红线 / 维护 / 设置；项目页工作区选择器与 MEMORY.md 预览、条目区、红线工作台、工具抽屉、设置页概览与显示选项、维护页、图标标记） | `lib/client.js` | `test/mini-react.mjs`、`locale/*.json` | `client` |
-| 前台会话记忆卡（Qoder 式摘要卡：头部六点拖动柄 + 图标底托 + 标题 + 收起，下接更新时间与一段话摘要；图标可选 `hudIcon`、大小 14–40px 走本机 `dsh-memory/session-hud/icon-size`（不是宿主配置）；尺寸 / 背景不透明度 / 背景色可选 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor`；头区可拖、位置持久化、按对话开关；设置页「会话卡外观」有滑杆 + 实时预览） | `lib/client.js` 的 `SessionMemoryHud` / `HUD_ICONS` / `hudReadIconSize` | `lib/api.js` 的 `/session-brief`（返回 `icon` + `hud` 外观）、`lib/store.js` 的 `sessionSearch`、`lib/index.js` 的 `workspaceForSession` / `activeSession` / `hud*` 配置 | `client` + `api` |
+| 前台会话记忆卡（Qoder 式摘要卡：头部六点拖动柄 + 图标底托 + 标题 + 收起，下接更新时间与一段话摘要；**开局不显示**——会话里还没有真实用户消息时整卡隐藏，`/session-brief` 的 `started` 翻成 true 后才出现；图标可选 `hudIcon`、大小 14–40px 走本机 `dsh-memory/session-hud/icon-size`（不是宿主配置）；尺寸 / 背景不透明度 / 背景色可选 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor`；头区可拖、位置持久化、按对话开关；设置页「会话卡外观」有滑杆 + 实时预览） | `lib/client.js` 的 `SessionMemoryHud` / `HUD_ICONS` / `hudReadIconSize` | `lib/api.js` 的 `/session-brief`（返回 `icon` + `hud` 外观 + `started`）、`lib/store.js` 的 `sessionSearch`、`lib/index.js` 的 `workspaceForSession` / `activeSession` / `sessionStarted` / `hud*` 配置 | `client` + `api` |
 | 清单兼容口径 / 市场元数据（`engines.dsh`、`dshReleases`、`marketplace`、`permissions`） | `package.json` | `README.md` 的「兼容性」、`tools/check-compat.mjs`、`.github/workflows/publish*.yml` | `host` + `node tools/check-compat.mjs` |
 | 提炼提示词、模型输出容错、触发条件 | `lib/distill.js` | `lib/index.js` 里的 capture 流程 | `distill` |
 | 全局原则晋升（候选准入 / 分层门槛 / 主题聚类 / 晋升执行） | `lib/distill-global.js` | `lib/index.js` 的 `runGlobalDistill` 与 `maybeDistillGlobally`、`docs/global-distill-trial-2026-11-05.md` | `distill-global` |
@@ -125,7 +125,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 红线冲突提示误报 / 漏报 | `redlineConflicts()` 复用 `detectContradictions()` 的疑似矛盾词法规则，是启发式；调阈值/否定词时同步 `store` 与 `api` 的红线测试 |
 | 首页「需要处理」数字与收件箱不一致 | `healthData` / `queueData` / `reviewData` 的拉取条件；收件箱只在 `attentionOpen` 时拉 queue / reviews |
 | 改完代码界面没变 | 宿主半（`lib/index.js` 等）改动要**重启 DSH**；纯客户端改动 `Ctrl+Shift+R` 硬刷新即可 |
-| 前台会话记忆卡不出现 / 位置没记住 | 宿主是否提供 `shell.overlay`；当前是否在对话页（设置弹窗、插件 / 自动化任务主面板会隐藏卡片）；设置页「该对话记忆」是否被关掉（按会话 id 存在 localStorage）；`localStorage` 是否可用（位置与展开状态也存本地）；卡片只认当前可见的 `[data-conversation-session]`，不再用最近活动会话兜底 |
+| 前台会话记忆卡不出现 / 位置没记住 | 该会话是否还没说过话（`/session-brief` 的 `started=false` 时按设计不显示，发出首条用户消息后 1s 内自动出现）；宿主是否提供 `shell.overlay`；当前是否在对话页（设置弹窗、插件 / 自动化任务主面板会隐藏卡片）；设置页「该对话记忆」是否被关掉（按会话 id 存在 localStorage）；`localStorage` 是否可用（位置与展开状态也存本地）；卡片只认当前可见的 `[data-conversation-session]`，不再用最近活动会话兜底 |
 | 升级 DSH 后插件整块不生效 / 市场卡片说「已安装，与当前 dsh 不兼容」 | `engines.dsh` 是否覆盖当前版本；跑 `node tools/check-compat.mjs` 看 README / package.json 是否同源。DSH 0.2.1 起不匹配会进 `skippedBundles`，记忆面板 / `memory` 工具 / `/memory/api` 全部不生效 |
 | 正式版没发出去 / Release 不是 Latest / 资产缺失 / npmjs 没更新 | 先跑 `node tools/release-watch.mjs` 看 CI 与 Release 结论；npmjs 步骤 skipped 时先看仓库是否配置了 `NPM_TOKEN`；完整流程见 `skills/release/SKILL.md` |
 | `main` 与最新 tag 不一致 | 正常：tag 之后可能还有未发版提交；发版前先 bump 版本并重新打 tag，不要移动旧 tag |
@@ -166,7 +166,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 ## 3. 命令速查
 
 ```powershell
-node test/run-all.mjs                  # 15 套件 / 701 断言，改完必跑（P6）
+node test/run-all.mjs                  # 15 套件 / 704 断言，改完必跑（P6）
 node test/store.test.mjs               # 单套件：把 store 换成 retrieval / api / client …
 
 pwsh -File install.ps1 -DryRun         # 只看要改什么，不落盘

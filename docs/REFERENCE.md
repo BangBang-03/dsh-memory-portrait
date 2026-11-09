@@ -11,7 +11,7 @@
 
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-701%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-704%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 DSH 的**工作区长期记忆**插件。对标 Qoder / WorkBuddy / ZCode 的记忆交互：记忆以当前工作区为单位落库，
 会话开始时把最重要的几条以**索引**形式注入系统提示（一行一条，正文按需用 `memory` 工具取，省 token），
@@ -53,7 +53,7 @@ pwsh -File install.ps1 -FromUrl https://github.com/BangBang-03/dsh-memory-portra
 市场元数据在 `package.json` 的 `dsh.marketplace` / `dsh.permissions`：声明 web / desktop、安装后需重启、桌面端有手动步骤；权限为本地读写、无外发网络、仅调用本地 `git` 做工作区身份识别。兼容口径用 `node tools/check-compat.mjs [--npm]` 核对 README、`package.json` 与 npmjs 已发布清单。headless / TUI 尚未做端到端验证，暂不声明。
 
 - 宿主半 `lib/index.js`：系统提示注入（索引/全文双模式）、轮末相关召回、`memory` 工具、`/memory/api` 路由、轮次结束自动提炼、打开 DSH 后的启动整理、自动刷新全局画像（WorkBuddy 式主路径）。
-- 客户端半 `lib/client.js`：设置面板里的「记忆」页，五个 tab——**项目记忆 / 全局记忆 / 红线**（范围由顶部页签决定：项目页只列本工作区条目与写入工具，全局页放全局画像与全局条目，红线页单列全部绝对禁令（跨范围，不跟页签的 scope 走）；条目区不再藏在抽屉里，档案 / 列表两种切法直接铺在页签里，库为空时换成「怎么开始」的引导卡）、**维护**（按系统状态 / 需要我处理 / 自动提炼 / 历史记录排，后者默认收起）、**设置**（顶部是只读的「记忆概览」——条数、项目/全局占比、类别分布、近 7 天新增、注入预算与画像覆盖（走 `GET /overview` 聚合端点，覆盖全部 active 记录，不为画图拉明细）；下面是「显示与视图」（默认视图 / 档案排布 / 列表密度 / 画像卡、统计行、变化横幅三个开关，只落本机 localStorage，不进宿主配置），再往下是注入 / 记录 / 二级蒸馏 / 治理 / 高级与数据五组，保存条吸底）。另有前台会话记忆卡：挂在宿主 `shell.overlay` 上的右下角悬浮卡，头部是「六点拖动柄 + 图标底托 + 标题 + 收起」，下面一行「更新于 YYYY-MM-DD HH:MM」，再往下是本会话沉淀的记忆摘要（标题连成一句，草稿与归档不可见）；空库时换成「还没有沉淀 + 聊几句后会出现」两行提示。图标由 `hudIcon` 选择（`a` 官方鲸鱼标默认，`b` 官方 App 图标，`c`–`g` 为二创位图），大小 14–40px 可调（`dsh-memory/session-hud/icon-size`，本机偏好、不进宿主配置，设置页「会话卡外观」滑杆 + 实时预览）；尺寸 / 背景不透明度 / 背景色由 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor` 控制，设置页「会话卡外观」用滑杆与取色器调，拖卡片右下角也能改大小（松手写回配置）；可收起 / 拖拽（按住头部六点抓手或头区空白，指针捕获 + rAF 合并，松手才提交位置），位置与展开状态存本地；设置页的「该对话记忆」可按对话关闭。卡片只属于当前可见对话：宿主设置弹窗打开、切到插件 / 自动化任务主面板或没有 `[data-conversation-session]` 时整卡隐藏，切换会话时重新拉新会话摘要；弹窗开合与会话 attr 变化走 `MutationObserver`，另有 1 秒兜底轮询。
+- 客户端半 `lib/client.js`：设置面板里的「记忆」页，五个 tab——**项目记忆 / 全局记忆 / 红线**（范围由顶部页签决定：项目页只列本工作区条目与写入工具，全局页放全局画像与全局条目，红线页单列全部绝对禁令（跨范围，不跟页签的 scope 走）；条目区不再藏在抽屉里，档案 / 列表两种切法直接铺在页签里，库为空时换成「怎么开始」的引导卡）、**维护**（按系统状态 / 需要我处理 / 自动提炼 / 历史记录排，后者默认收起）、**设置**（顶部是只读的「记忆概览」——条数、项目/全局占比、类别分布、近 7 天新增、注入预算与画像覆盖（走 `GET /overview` 聚合端点，覆盖全部 active 记录，不为画图拉明细）；下面是「显示与视图」（默认视图 / 档案排布 / 列表密度 / 画像卡、统计行、变化横幅三个开关，只落本机 localStorage，不进宿主配置），再往下是注入 / 记录 / 二级蒸馏 / 治理 / 高级与数据五组，保存条吸底）。另有前台会话记忆卡：挂在宿主 `shell.overlay` 上的右下角悬浮卡，头部是「六点拖动柄 + 图标底托 + 标题 + 收起」，下面一行「更新于 YYYY-MM-DD HH:MM」，再往下是本会话沉淀的记忆摘要（标题连成一句，草稿与归档不可见）；空库时换成「还没有沉淀 + 聊几句后会出现」两行提示。图标由 `hudIcon` 选择（`a` 官方鲸鱼标默认，`b` 官方 App 图标，`c`–`g` 为二创位图），大小 14–40px 可调（`dsh-memory/session-hud/icon-size`，本机偏好、不进宿主配置，设置页「会话卡外观」滑杆 + 实时预览）；尺寸 / 背景不透明度 / 背景色由 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor` 控制，设置页「会话卡外观」用滑杆与取色器调，拖卡片右下角也能改大小（松手写回配置）；可收起 / 拖拽（按住头部六点抓手或头区空白，指针捕获 + rAF 合并，松手才提交位置），位置与展开状态存本地；设置页的「该对话记忆」可按对话关闭。卡片只属于当前可见对话：宿主设置弹窗打开、切到插件 / 自动化任务主面板或没有 `[data-conversation-session]` 时整卡隐藏，切换会话时重新拉新会话摘要；弹窗开合与会话 attr 变化走 `MutationObserver`，另有 1 秒兜底轮询。**开局不显示**：DSH 在空白页就已经建好会话并挂上 `data-conversation-session`，所以「出不出卡」按「这个会话里有没有真实用户消息」判（`/session-brief` 的 `started`：宿主看会话转录，取不到时退回会话索引），不看「会话已创建 / 已进入对话页」——后两者在开局就成立。`started=false` 期间整卡隐藏，客户端按 1s 快节奏探一次；首条用户消息进来后卡片立刻出现，并回到展开 5s / 收起 15s 的常规节奏。
 - 纯逻辑层：`lib/store.js`（存储）、`lib/dream.js`（整理管线）、`lib/distill.js`（提炼）、`lib/api.js`（HTTP 契约），都不依赖 DSH，可独立测试。
 
 ## 新增：对齐市场同类后补的十六处
@@ -334,7 +334,7 @@ pwsh -File uninstall.ps1 -PurgeStorage   # 连 ~/.dsh/storages/dsh-memory 一起
 ```powershell
 git checkout lab                       # 默认分支；平时只在这里动
 # …改代码…
-node test/run-all.mjs                  # 本机跑一遍：15 个套件 701 条断言
+node test/run-all.mjs                  # 本机跑一遍：15 个套件 704 条断言
 git add <改动的文件>; git commit -m "feat: …"   # 不要用 git add -A（.probe/ 是本地材料）
 
 $out = node tools/push.mjs --branch lab; $out   # 输出 base = 上一版在本地的对应提交
@@ -606,7 +606,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 复审到期自动续期（连两轮零引用才升级）+ 自动路径不扫矛盾、手动整理才产出只读线索 + 报告过期未用、二级蒸馏与全局原则晋升 + 画像重写（默认直接落库）。手动整理另做**一次**打包语义裁决：只有判 `duplicate` 的簇才合并，`contradicts` 必须给出同一主谓宾的互斥取值与分落两条的证据，否则强制回落 `unrelated`；无模型路由时静默跳过 |
 | POST | `/candidates/reject` | 「不再提议」：把候选原则标成 rejected，之后同主题不再晋升。`{ ids, reason? }` |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
-| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + `hudIcon` 图标键 + `hud` 外观（`width` / `height` / `opacity` / `color`；卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
+| GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + `hudIcon` 图标键 + `hud` 外观（`width` / `height` / `opacity` / `color`；卡片只展示记忆摘要；草稿与归档不可见）+ `started`（该会话是否已有真实用户发言；`false` 时前台卡不渲染）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
 | GET | `/injections` | 注入审计：最近真正进 prompt 的内容（正文预览 + sha256 前 16 位 + id 列表 + 被挤掉的条目；`full=1` 给原文，`kind` 可过滤） |
 | GET | `/derivations` | 跨层派生链：每层派生了什么、源现在还成不成立（`state` 为 `fresh` / `dirty`，带失效原因） |
 | GET | `/reviews` | 复审队列：带失效条件、到期该复查的记忆（`due` / `soon`） |
@@ -727,7 +727,7 @@ cd <克隆下来的 dsh-memory 目录>
 npm test          # 或 node test/run-all.mjs
 ```
 
-15 个套件、701 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
+15 个套件、704 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
 
 - `store` 178 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
   工作区不存在时不造目录）、导入导出、并发写；v0.3.0：版本链 supersede/rollback、user 类别强制全局与跨库迁移、
@@ -763,13 +763,13 @@ npm test          # 或 node test/run-all.mjs
   按证据强度分层的晋升门槛（constraint / feedback / preference 单项目即可，decision / convention 要第二个项目）、
   主题词聚类与项目去重、模型输出解析容错（按类别分层的锚点底线、空数组 / 坏 JSON / 全被拒绝的诊断计数、
   对象包数组的容错），自适应节奏公式（空跑指数退避、素材闸 + 用户证据捷径），以及「候选池 → 晋升」端到端链路。
-- `api` 90 项 —— 54 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
+- `api` 91 项 —— 54 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
   /health 与 /health/resolve、/timeline、草稿队列（批准带编辑 / 拒绝 / 带 supersedes 的批准兑现版本链）、
   /save 带 supersedes 与 /supersede/rollback；v0.6：`GET /portrait/diff`（上一版 → 当前版的逐段 diff）；
   0.6.4：`GET /record` 依据下钻、`/redline/check` 冲突检查、`/redline/update` 改稿审计、
   `/redline/history` 与 `/redline/rollback`、Dream 时序矛盾归档与 `/health/resolve time-order`。
 - `host` 26 项 —— 导出形状、Config 默认值与越界校验（含二级蒸馏的素材门槛 / 基础间隔）、C7 文档覆盖闸。
-- `activate` 68 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
+- `activate` 69 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
   工具 save/search/get/forget、全文简报装不下时明说「只列了 N / M 条」、`/memory/api/*` 路由真的应答
   且守好 403/404、手动提炼端到端、面板保存落到工作区镜像、既有记忆扫描导入、数据目录不可用不炸外壳；
   v0.3.0：索引简报（带 id 不展开正文 + full 模式对照）、轮末召回（召回块出现、连续两轮不重复）、
@@ -784,7 +784,7 @@ npm test          # 或 node test/run-all.mjs
   会话索引不把尾部召回块写成本轮用户发言（避免自我召回与重复提炼）。
 - `briefing-stability` 18 项 —— 会话级冻结快照、确定性排序、轮末召回的尾部注入与去重、重算硬冷却（冷却期内攒够条数也不追加系统提示）；
   改检索算法时用它守住「系统提示字节稳定」。
-- `client` 78 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
+- `client` 79 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
   接到真实 `store` + `api` 上驱动交互（列表 / 搜索 / 新建 / 删除 / 置顶 / 中英文切换 / 后端报错）；
   档案视图的分区与两种排布、整篇编辑、整理、开关即时落库、时间线与维护 tab、五个页签
   （项目 / 全局 / 红线各自独立，红线不再混在全局页）、项目页切换工作区后只显示该工作区的条目并预览其 MEMORY.md；

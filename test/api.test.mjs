@@ -1116,6 +1116,7 @@ await test('GET /session-brief：只返回本会话的诉求与已沉淀记忆�
   );
   assert.equal(res.body.records.length, 1, '只应返回本会话已生效的记忆');
   assert.equal(res.body.records[0].title, '本会话已沉淀');
+  assert.equal(res.body.started, true, '已经有用户发言的会话应标记为已开始（前台卡才显示）');
   assert.ok(res.body.updatedAt, '应给出最新时间');
   assert.equal(res.body.icon, 'a', '默认图标为官方鲸鱼标');
   assert.deepEqual(
@@ -1145,6 +1146,7 @@ await test('GET /session-brief：只返回本会话的诉求与已沉淀记忆�
   const unknown = await call('GET', '/session-brief', { query: { session: 's-none' } });
   assert.equal(unknown.body.entries.length, 0);
   assert.equal(unknown.body.records.length, 0);
+  assert.equal(unknown.body.started, false, '没有说过话的会话不算开始（开局不显示前台卡）');
   const missing = await call('GET', '/session-brief', { query: {} });
   assert.equal(missing.body.session, 's-brief-1', '不传 session 时应回落最近活动会话');
   assert.deepEqual(
@@ -1152,6 +1154,31 @@ await test('GET /session-brief：只返回本会话的诉求与已沉淀记忆�
     ['把草稿挡在前台之外', '先做悬浮会话记忆卡'],
   );
   assert.equal(missing.body.records.length, 1);
+});
+
+await test('GET /session-brief：会话是否已开始以宿主判定为准（索引还没落盘也能算开始）', async () => {
+  const live = createApi({
+    store,
+    settings,
+    activeWorkspace: () => WS,
+    listWorkspaces: () => KNOWN_WORKSPACES.map((root) => ({ key: workspaceKey(root), root, active: root === WS })),
+    workspaceForSession: () => WS,
+    activeSession: () => null,
+    /* 宿主按会话转录判定：刚说完第一句、轮末索引还没写下来的这一刻也该显示。 */
+    sessionStarted: (id) => String(id) === 's-live',
+    captures: () => [],
+    version: '0.1.0',
+  });
+  const briefOf = (session) =>
+    live.handle({ method: 'GET', pathname: `${API_PREFIX}/session-brief`, query: { session } });
+
+  const hot = await briefOf('s-live');
+  assert.equal(hot.status, 200);
+  assert.equal(hot.body.started, true, '宿主判定已开始的会话，即使索引为空也要显示');
+  assert.equal(hot.body.entries.length, 0, '这个会话确实还没有落盘的诉求原文');
+
+  const cold = await briefOf('s-quiet');
+  assert.equal(cold.body.started, false, '宿主没判定开始、也没有索引时必须算开局');
 });
 
 await test('GET /injections：注入审计带预览，full=1 给原文，可按 kind 过滤', async () => {

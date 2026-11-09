@@ -2916,6 +2916,31 @@ await test('前台会话卡：该对话记忆关闭时不渲染', async () => {
   }
 });
 
+await test('前台会话卡：开局（会话还没开始）不渲染，说过话之后才出现', async () => {
+  /* 空白新会话：宿主已经建好会话、也挂上了 data-conversation-session，但一条用户消息都没有。 */
+  sessionNodes.length = 0;
+  sessionNodes.push(conversationNode('s-blank'));
+  storage.set('dsh-memory/session-hud/open', '1');
+  const hud = slotRegistrations.get('shell.overlay');
+  const handle = mini.render(mini.react.createElement(hud.component, { t: makeT('zh') }));
+  try {
+    await settle(12);
+    assert.equal(
+      nodesByClass(handle.tree, 'dshmem_hud').length,
+      0,
+      '开局空白会话不应出现会话卡（既不该有卡片，也不该有胶囊）',
+    );
+
+    /* 首条用户消息：/session-brief 的 started 翻成 true，1s 快轮询应把它探出来。 */
+    store.sessionLogAppend(WS, { sessionId: 's-blank', turn: 1, text: '刚开的新会话，先说一句让它变成已开始' });
+    await sleep(1300);
+    await settle(6);
+    assert.equal(nodesByClass(handle.tree, 'dshmem_hud').length, 1, '会话开始后卡片应正常出现');
+  } finally {
+    storage.delete('dsh-memory/session-hud/open');
+  }
+});
+
 await test('前台会话卡：收起为胶囊，展开后只显示本会话已沉淀记忆', async () => {
   /* 前一个用例点开过卡片，展开状态会存下来；这里恢复到默认收起再断言胶囊。 */
   storage.delete('dsh-memory/session-hud/open');
@@ -3021,6 +3046,8 @@ await test('前台会话卡：切换对话后只显示新会话', async () => {
   await settle(12);
   assert.match(mini.textOf(nodesByClass(hudHandle.tree, 'dshmem_hud_card')[0]), /会话卡已沉淀/);
 
+  /* 切过去的新会话已经说过话（会话已开始），只是记忆还不在它名下。 */
+  store.sessionLogAppend(WS, { sessionId: 's-other', turn: 1, text: '新会话里的第一句话' });
   node.attrs['data-conversation-session'] = 's-other';
   const watcher = observers
     .slice()
@@ -3066,6 +3093,8 @@ await test('前台会话卡：图标大小读本机偏好，越界 / 坏值夹�
 await test('前台会话卡：空态给「还没有」+「下一步」两行，固定高度时居中', async () => {
   sessionNodes.length = 0;
   sessionNodes.push(conversationNode('s-empty'));
+  /* 已经说过话（会话已开始）但一条记忆都还没沉淀：这才是空态该出现的场景。 */
+  store.sessionLogAppend(WS, { sessionId: 's-empty', turn: 1, text: '刚开口，还没有可沉淀的结论' });
   storage.set('dsh-memory/session-hud/open', '1');
   settingsValue.hudHeight = 300;
   const hud = slotRegistrations.get('shell.overlay');
