@@ -137,7 +137,7 @@ function activate({ services = {}, briefingRebuildMinNew = 1, briefingRebuildCoo
   const dir = fs.mkdtempSync(path.join(tmp, 'data-'));
   const { ctx, calls } = createFakeCtx(services);
   /* 老用例默认关掉重算闸（1 条 / 0ms），保持「写一条就重算」的旧语义；
-     重算闸本身由下面专门的用例用生产默认值（3 条 / 10 分钟）验证。 */
+     重算闸本身由下面专门的用例用生产默认值（3 条 / 30 分钟）验证。 */
   mod.apply(ctx, { directory: dir, briefingRebuildMinNew, briefingRebuildCooldownMs, ...config });
   const tool = calls.tools[0];
   const route = calls.routes[0]?.handler;
@@ -201,9 +201,10 @@ await test('briefing 排序：同一批记录换个落库顺序，取出的顺�
   assert.deepEqual(idsB, idsA, '落库顺序不该影响简报顺序');
   assert.equal(idsA.length, ORDER_ROWS.length);
 
-  /* 置顶 → 类别权重 → createdAt → id 的全序：preference 权重最高排最前，
-     convention 两条按 createdAt 升序且用 id 兜底，note 最后。 */
-  assert.deepEqual(idsA, ['mem_order_1', 'mem_order_0', 'mem_order_3', 'mem_order_2']);
+  /* 置顶 → 类别权重 → createdAt **降序** → id 的全序：preference 权重最高排最前，
+     两条 convention 里新写的（01-04）排在旧的（01-01）前面——这是 latest-write-wins 的落点，
+     note 最后。 */
+  assert.deepEqual(idsA, ['mem_order_1', 'mem_order_3', 'mem_order_0', 'mem_order_2']);
 });
 
 await test('briefing 排序：使用次数增长不改顺序（useCount 不参与简报排序）', () => {
@@ -301,9 +302,10 @@ await test('记忆真写入时重算一次、之后重新冻结；重建原因�
   assert.equal(state3.briefing.reason, 'frozen');
 });
 
-await test('简报重算闸：默认攒 3 条新记录才重算，单条写入只合并不追加', async () => {
-  /* 生产默认值：3 条 / 10 分钟。每次重算都会让宿主把整份系统提示再追加进历史，
-     所以「写一条就重算」必须被闸住。 */
+await test('简报重算闸：冷却期内即使攒够 3 条也不重算，单条写入只合并不追加', async () => {
+  /* 生产默认值 3 条 / 30 分钟；这里显式设 10 分钟，断言不依赖默认值漂移。
+     每次重算都会让宿主把整份系统提示再追加进历史，所以冷却期必须是硬间隔——
+     条数只决定「冷却结束后值不值得重算」，不能反过来击穿冷却。 */
   const { tool, exec, route, render } = activate({ briefingRebuildMinNew: 3, briefingRebuildCooldownMs: 600000 });
   assert.equal(render(), '', '空库先装配一次空简报');
   const base = await callRoute(route, '/state');
@@ -317,23 +319,14 @@ await test('简报重算闸：默认攒 3 条新记录才重算，单条写入�
   assert.equal(one.briefing.builds, 1, '合并等待不算一次重算');
 
   await tool.execute(memory('重算闸乙：发布顺序', '发布前先推 main 并跑完全量测试，再打 v* 标签。'), exec);
-  assert.equal(render(), '', '2 条仍未达门槛');
-
   await tool.execute(memory('重算闸丙：截图规范', '文档配图不要用真实记忆面板截图，避免泄露用户数据。'), exec);
-  const built = render();
-  assert.match(built, /重算闸丙：截图规范/, '攒够 3 条后一次性推给模型');
-  assert.match(built, /重算闸甲：构建命令/, '同一批写入一起出现');
+  assert.equal(render(), '', '冷却期内攒够 3 条也继续冻结');
   const three = await callRoute(route, '/state');
-  assert.equal(three.briefing.reason, 'memory');
-  assert.equal(three.briefing.builds, 2);
+  assert.equal(three.briefing.reason, 'coalesced');
+  assert.equal(three.briefing.pendingNew, 3);
+  assert.equal(three.briefing.builds, 1, '一次重算都没发生');
 
-  await tool.execute(memory('重算闸丁：日志入口', '工作日志统一走 memory action=journal，不要另建文件。'), exec);
-  assert.equal(render(), built, '第 4 条又回到合并等待');
-  const again = await callRoute(route, '/state');
-  assert.equal(again.briefing.reason, 'coalesced');
-  assert.equal(again.briefing.builds, 2);
-
-  /* 红线例外：新增红线绕过条数 / 时间闸，立刻进简报（安全边界）。 */
+  /* 红线例外：新增红线绕过条数与冷却，立刻进简报（安全边界）。 */
   await tool.execute(
     {
       action: 'save',
@@ -344,10 +337,38 @@ await test('简报重算闸：默认攒 3 条新记录才重算，单条写入�
     exec,
   );
   const withRedline = render();
-  assert.match(withRedline, /绝不 force push main/, '红线新增立刻重算，不等攒批');
+  assert.match(withRedline, /绝不 force push main/, '红线新增立刻重算，不等冷却');
   const redlineState = await callRoute(route, '/state');
   assert.equal(redlineState.briefing.reason, 'memory');
-  assert.equal(redlineState.briefing.builds, 3);
+  assert.equal(redlineState.briefing.builds, 2);
+});
+
+await test('简报重算闸：冷却结束后，攒够条数才一次性重算', async () => {
+  /* 用可控时钟跨过冷却，避免 sleep 抖动：真实机器上 3 次落库偶尔就能超过 50ms。 */
+  const realNow = Date.now;
+  let clock = realNow();
+  Date.now = () => clock;
+  try {
+    const { tool, exec, route, render } = activate({ briefingRebuildMinNew: 3, briefingRebuildCooldownMs: 600000 });
+    render();
+    await tool.execute(memory('冷却后甲：构建命令'), exec);
+    await tool.execute(memory('冷却后乙：发布顺序'), exec);
+    await tool.execute(memory('冷却后丙：截图规范'), exec);
+    assert.equal(render(), '', '冷却期内先合并');
+
+    clock += 600001;
+    const built = render();
+    assert.match(built, /冷却后甲：构建命令/);
+    assert.match(built, /冷却后丙：截图规范/, '同一批写入一起出现');
+    const state = await callRoute(route, '/state');
+    assert.equal(state.briefing.reason, 'memory');
+    assert.equal(state.briefing.builds, 2);
+
+    await tool.execute(memory('冷却后丁：日志入口'), exec);
+    assert.equal(render(), built, '刚重算过，下一条又回到合并等待');
+  } finally {
+    Date.now = realNow;
+  }
 });
 
 await test('简报重算闸：条数没攒够时，时间闸到点也会重算（编辑/归档/画像兜底）', async () => {
@@ -419,8 +440,10 @@ await test('工作区换了就重建；setting 改了模式也重建', async () 
 async function seedRecall(config = {}) {
   const fixture = activate({ briefingLimit: 1, ...config });
   const { calls, tool, exec, session } = fixture;
-  await tool.execute(memory('甲记忆：客户端半的样式基调用鲸鱼蓝'), exec);
+  /* 先写构建命令、后写甲记忆：简报 limit=1 且新条优先，所以简报装甲记忆；
+     用户接下来的问题命中构建命令，召回才有东西可注入（已在简报里的条目不重复注入）。 */
   await tool.execute(memory('构建命令是 pnpm build', '改完客户端半要重跑 pnpm build。'), exec);
+  await tool.execute(memory('甲记忆：客户端半的样式基调用鲸鱼蓝'), exec);
   session.deriveMessages = () => [
     { role: 'user', content: [{ type: 'text', text: '帮我跑一下构建命令，然后告诉我结果' }] },
     { role: 'assistant', content: [{ type: 'text', text: '好的' }] },
@@ -434,8 +457,10 @@ const userSay = (text) => ({ role: 'user', content: [{ type: 'text', text }], so
 await test('召回不进系统提示；agent/pre-step 把它折进进入批次，且一轮只发一次', async () => {
   const { calls, session, render } = await seedRecall();
   const section = render();
-  /* 简报索引里只有「甲记忆」（limit=1），召回应完全是尾部的东西。 */
+  /* 简报索引里只有 1 条（limit=1），且是新写的那条——latest-write-wins；
+     超预算的旧条不该挤进来。召回应完全是尾部的东西。 */
   assert.match(section, /甲记忆/);
+  assert.doesNotMatch(section, /构建命令是 pnpm build/, '超预算的旧条不该挤进简报');
   assert.doesNotMatch(section, /### 与当前话题相关的召回/, '系统提示里不该再有召回块');
   assert.doesNotMatch(section, /只是背景参考/, '召回块的措辞也不该出现在系统提示里');
   assert.doesNotMatch(section, /改完客户端半要重跑/, '召回的正文摘录更不该出现在系统提示里');

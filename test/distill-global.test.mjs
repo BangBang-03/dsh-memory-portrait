@@ -388,6 +388,7 @@ test('素材闸：未覆盖达到门槛才触发；用户亲口说的可以提�
   const gate = distillDue({ materials: user, candidates: [], project: 'p', minNew: 5 });
   assert.equal(gate.due, true, '两条用户证据可以越过总素材门槛');
   assert.equal(gate.userEvidence, 2);
+  assert.deepEqual(gate.fresh.map((record) => record.id), ['u1', 'u2'], '自动蒸馏要能拿到这批增量素材');
 
   const covered = distillDue({
     materials,
@@ -397,6 +398,7 @@ test('素材闸：未覆盖达到门槛才触发；用户亲口说的可以提�
   });
   assert.equal(covered.uncovered, 2, '被候选引用过的不再算新素材');
   assert.equal(covered.due, false);
+  assert.deepEqual(covered.fresh.map((record) => record.id), ['m2', 'm3'], '只把未覆盖的传给模型');
 });
 
 /* ---------------- 集成：候选池 → Dream 巡检 → 全局记忆 ---------------- */

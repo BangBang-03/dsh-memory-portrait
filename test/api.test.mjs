@@ -781,7 +781,8 @@ await test('GET /health 报告疑似矛盾对、files 失效与 overBudget（bri
   ).record;
 
   settings.set({ briefingLimit: 2 }); // 12 条 active > 2×5，应亮
-  const res = await isoCall('GET', '/health', { query: { workspace: ws } });
+  /* 矛盾线索默认不产出（误报率高），这里显式开诊断开关。 */
+  const res = await isoCall('GET', '/health', { query: { workspace: ws, contradictions: 1 } });
   assert.equal(res.status, 200);
   const pair = res.body.health.contradictions.find((c) => c.a === drop.id && c.b === keep.id);
   assert.ok(pair, '应报 pnpm/npm 疑似矛盾对');
@@ -958,7 +959,7 @@ await test('Dream 时序矛盾：只报告不归档，确认后走 /health/resol
   const oldManual = add('缓存必须每天清理。', '缓存必须每天清理。', 'manual', '2026-01-01T00:00:00.000Z', ['cache-time']);
   add('缓存不要每天清理。', '缓存不要每天清理。', 'agent', '2026-02-01T00:00:00.000Z', ['cache-time']);
   const manualPair = s
-    .health({ workspace: ws })
+    .health({ workspace: ws, includeContradictions: true })
     .contradictions.find((pair) => pair.a === oldManual.id || pair.b === oldManual.id);
   assert.ok(manualPair, '应检出用户旧条与模型新条');
   res = await api.handle({
@@ -1583,6 +1584,71 @@ await test('GET /overview 聚合计数 / 类别 / 趋势 / 画像覆盖', async 
   assert.ok(ov.portrait && ov.portrait.filled >= 1, '画像覆盖应报出有内容的段');
   assert.ok(ov.portrait.total >= ov.portrait.filled);
   assert.equal(typeof ov.portrait.version, 'number');
+});
+
+await test('语义裁决：无模型/坏 JSON 静默回落；Dream 只合并 duplicate 簇', async () => {
+  const { createAdjudicator } = await import('../lib/adjudicate.js');
+  const { createDreamRunner } = await import('../lib/dream.js');
+  const dir = fs.mkdtempSync(path.join(tmp, 'adjudicate-'));
+  const s = createMemoryStore({ dir, mirror: false });
+  const ws = path.join(tmp, 'adjudicate-ws');
+  fs.mkdirSync(ws, { recursive: true });
+  const a = s.upsert({ title: '重复甲', content: '语义裁决测试 identical-content' }, { workspace: ws }).record;
+  const b = s.upsert({ title: '重复乙', content: '语义裁决测试 identical-content' }, { workspace: ws }).record;
+  const clusters = [[a, b]];
+
+  /* 没有模型路由：不调用、不抛错、不裁决。 */
+  const noModel = createAdjudicator({ callLlm: null });
+  const off = await noModel.adjudicate(clusters);
+  assert.equal(off.ok, false);
+  assert.equal(off.verdicts.size, 0);
+
+  /* 模型回了垃圾：一次调用后静默回落，不让整理失败。 */
+  let junkCalls = 0;
+  const junk = createAdjudicator({
+    callLlm: async () => {
+      junkCalls += 1;
+      return '完全不是 JSON';
+    },
+  });
+  const broken = await junk.adjudicate(clusters);
+  assert.equal(broken.ok, false);
+  assert.equal(broken.reason, 'bad_json');
+  assert.equal(junkCalls, 1, '一次调用打包所有簇');
+
+  /* 裁决说 complementary → 跳过合并；说 duplicate → 正常合并。 */
+  const verdict = async (relation) =>
+    createAdjudicator({
+      callLlm: async ({ userText }) =>
+        JSON.stringify(
+          JSON.parse(userText).clusters.map((c) => ({ key: c.key, relation, confidence: 0.8 })),
+        ),
+    }).adjudicate;
+
+  const skipped = await createDreamRunner({
+    store: s, settings, adjudicateNow: await verdict('complementary'),
+  }).run({ workspace: ws, source: 'manual' });
+  assert.equal(skipped.adjudication.attempted, true);
+  assert.equal(skipped.adjudication.ok, true);
+  assert.ok(skipped.adjudicationSkipped.length >= 1, '非 duplicate 簇应被跳过');
+  assert.equal(skipped.merged.length, 0, '裁决说不合并就不许合并');
+
+  const dir2 = fs.mkdtempSync(path.join(tmp, 'adjudicate-dup-'));
+  const s2 = createMemoryStore({ dir: dir2, mirror: false });
+  s2.upsert({ title: '重复甲', content: '语义裁决测试 identical-content' }, { workspace: ws });
+  s2.upsert({ title: '重复乙', content: '语义裁决测试 identical-content' }, { workspace: ws });
+  const merged = await createDreamRunner({
+    store: s2, settings, adjudicateNow: await verdict('duplicate'),
+  }).run({ workspace: ws, source: 'manual' });
+  assert.equal(merged.adjudicationSkipped.length, 0);
+  assert.ok(merged.merged.length >= 1, 'duplicate 裁决应放行合并');
+
+  /* 自动整理（启动检查）绝不调用模型。 */
+  const autoRunner = createDreamRunner({
+    store: s2, settings, adjudicateNow: await verdict('complementary'),
+  });
+  const auto = await autoRunner.run({ workspace: ws, source: 'auto' });
+  assert.equal(auto.adjudication.attempted, false, '自动整理默认 0 次模型调用');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

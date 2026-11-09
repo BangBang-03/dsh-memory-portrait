@@ -393,6 +393,19 @@ await test('CSS 只注入一次，且带 data-plugin-css 标记', () => {
   assert.match(styleTags[0].textContent, /--dsw-static-deepseek-450/);
 });
 
+await test('拖动柄样式：命中区覆盖整个图标，且不把手势交给页面滚动', () => {
+  const css = styleTags[0].textContent;
+  assert.match(css, /\.dshmem_hud_grip\{[^}]*width:30px;height:30px/, '拖动柄命中区应是 30×30');
+  assert.match(css, /\.dshmem_hud_grip\{[^}]*touch-action:none/, '拖动柄不应触发页面滚动');
+  assert.match(css, /\.dshmem_hud_grip\{[^}]*cursor:grab/, '拖动柄应给出可拖动光标');
+  /* 点阵必须是纯 CSS 画出来的：不依赖 SVG 子节点，宿主渲染成什么样都看得见。 */
+  assert.match(css, /\.dshmem_hud_grip::before\{[^}]*radial-gradient/, '拖动柄点阵应由 CSS 绘制');
+  assert.equal((css.match(/radial-gradient\(circle at /g) || []).length >= 6, true, '拖动柄应有六个点');
+  assert.match(css, /\.dshmem_hud_grip:hover\{/, '拖动柄缺少悬停反馈');
+  assert.match(css, /\.dshmem_hud_grip\[data-static="1"\]/, '预览里的抓手应不可点');
+  assert.match(css, /\[data-dragging="1"\]/, '拖动中缺少状态样式');
+});
+
 await test('次级文字对比度：dim 级文本由 currentColor 派生（随主题/背景自适应）', () => {
   const css = styleTags[0].textContent;
   assert.match(
@@ -968,7 +981,7 @@ await test('设置页：会话卡大小 / 不透明度 / 颜色可调并写进�
   await settle(12);
 
   const body = text();
-  for (const key of ['hudWidthLabel', 'hudHeightLabel', 'hudOpacityLabel', 'hudColorLabel']) {
+  for (const key of ['hudWidthLabel', 'hudHeightLabel', 'hudOpacityLabel', 'hudColorLabel', 'hudIconSizeLabel']) {
     assert.match(body, new RegExp(escapeRe(t(key))), `设置页缺少 ${key}`);
   }
 
@@ -976,11 +989,24 @@ await test('设置页：会话卡大小 / 不透明度 / 颜色可调并写进�
   const widthSlider = ranges.find((node) => String(node.props.min) === '240');
   const heightSlider = ranges.find((node) => String(node.props.min) === '180');
   const opacitySlider = ranges.find((node) => String(node.props.min) === '0.35');
+  const iconSlider = ranges.find((node) => String(node.props.min) === '14');
   assert.ok(widthSlider, '缺少卡片宽度滑杆');
   assert.ok(heightSlider, '缺少卡片高度滑杆');
   assert.ok(opacitySlider, '缺少背景不透明度滑杆');
+  assert.ok(iconSlider, '缺少图标大小滑杆');
   assert.equal(String(widthSlider.props.value), '340', '宽度滑杆默认 340');
   assert.equal(String(heightSlider.props.value), '180', '高度自适应时滑杆停在最小值');
+  assert.equal(String(iconSlider.props.max), '40', '图标大小上限 40');
+  assert.equal(String(iconSlider.props.value), '20', '图标大小默认 20');
+
+  /* 图标大小：本机偏好，拖滑杆立即落盘，预览实时跟着变。 */
+  const previewAt = () => mini.findAll(view, byClass('dshmem_hudPreview'))[0];
+  assert.ok(previewAt(), '缺少实时预览');
+  assert.equal(previewAt().props.style['--dshmem-hud-icon'], '20px', '预览默认图标 20px');
+  iconSlider.props.onChange({ target: { value: '32' } });
+  await settle(4);
+  assert.equal(storage.get('dsh-memory/session-hud/icon-size'), '32', '图标大小应落本机');
+  assert.equal(previewAt().props.style['--dshmem-hud-icon'], '32px', '预览应实时跟随图标大小');
 
   widthSlider.props.onChange({ target: { value: '420' } });
   heightSlider.props.onChange({ target: { value: '300' } });
@@ -1007,6 +1033,7 @@ await test('设置页：会话卡大小 / 不透明度 / 颜色可调并写进�
   settingsValue.hudHeight = 0;
   settingsValue.hudOpacity = 1;
   settingsValue.hudColor = '';
+  storage.delete('dsh-memory/session-hud/icon-size');
 });
 
 /* ---------------- 设置页：记忆概览 + 显示与视图 ---------------- */
@@ -1699,6 +1726,9 @@ await test('维护 tab：KPI 与体检结果渲染，/health 真被调用', asyn
   renderPage('zh');
   await settle(8);
   await clickTab('tabMaintain');
+  /* 矛盾线索默认不扫（误报率高），这里显式点开诊断开关再断言。 */
+  mini.click(mini.findByText(view, makeT('zh')('healthContradictionScan'), 'button'));
+  await settle(8);
   const body = text();
   assert.match(body, new RegExp(escapeRe(makeT('zh')('healthKpiTotal'))), '缺少记忆总数 KPI');
   assert.match(body, new RegExp(escapeRe(makeT('zh')('healthToken'))), '缺少简报注入 KPI');
@@ -1940,6 +1970,9 @@ await test('维护页：Dream 只报告矛盾，确认后才按时序归档', as
     await settle(10);
     await clickTab('tabMaintain');
     await settle(8);
+    /* 矛盾区默认不扫；显式打开诊断，才会有「按时序归档旧条」按钮。 */
+    mini.click(mini.findByText(view, makeT('zh')('healthContradictionScan'), 'button'));
+    await settle(8);
     mini.click(mini.findByText(view, makeT('zh')('dreamRun'), 'button'));
     await settle(16);
 
@@ -1967,6 +2000,8 @@ await test('维护页：Dream 只报告矛盾，确认后才按时序归档', as
     await settle(10);
     await clickTab('tabMaintain');
     await settle(10);
+    mini.click(mini.findByText(view, makeT('zh')('healthContradictionScan'), 'button'));
+    await settle(8);
     const timeOrderTwo = mini.findByText(view, makeT('zh')('healthTimeOrder'), 'button');
     assert.ok(timeOrderTwo, '第二对应仍提供按时序归档按钮');
     mini.click(timeOrderTwo);
@@ -2917,6 +2952,35 @@ await test('前台会话卡：收起为胶囊，展开后只显示本会话已�
     assert.equal(card.props.style['--dshmem-hud-fg'], '#f5f7fb', '深色底应自动换成浅色文字');
     assert.equal(nodesByClass(card, 'dshmem_hud_resize').length, 1, '缺少右下角缩放把手');
 
+    /* 拖动柄：可视化的「按住这里拖动」入口，必须覆盖整个图标、且不抢手势。 */
+    const grip = nodesByClass(card, 'dshmem_hud_grip')[0];
+    assert.ok(grip, '缺少可视化拖动柄');
+    assert.equal(grip.type, 'button', '拖动柄应是可聚焦的按钮，而不是装饰');
+    assert.equal(grip.props.title, makeT('zh')('hudDrag'), '拖动柄应带拖动提示');
+    assert.equal(grip.props['aria-label'], makeT('zh')('hudDrag'), '拖动柄应有无障碍名称');
+    assert.equal(typeof grip.props.onPointerDown, 'function', '拖动柄应按得住');
+    assert.equal(grip.props['data-dragging'], '0', '静止时不应处于拖动态');
+    assert.equal(
+      (grip.children || []).length,
+      0,
+      '拖动柄不该靠子节点画点阵（宿主可能渲染不出 SVG，点阵改由 CSS 画）',
+    );
+
+    const hudHead = nodesByClass(card, 'dshmem_hud_head')[0];
+    assert.equal(typeof hudHead?.props?.onPointerDown, 'function', '头区空白处仍可拖动');
+    assert.equal(nodesByClass(hudHead, 'dshmem_hud_iconbtn').length, 1, '收起按钮不应被拖动柄顶掉');
+    const cardTitle = nodesByClass(card, 'dshmem_hud_title')[0];
+    assert.equal(mini.textOf(cardTitle).trim(), makeT('zh')('hudTitle'), '缺少卡片标题');
+    const brand = nodesByClass(card, 'dshmem_hud_brand')[0];
+    assert.ok(brand, '缺少图标底托');
+    assert.equal(nodesByClass(brand, 'dshmem_hud_glyph').length, 1, '图标应放在底托里');
+    assert.equal(card.props.style['--dshmem-hud-icon'], '20px', '图标大小默认 20px');
+    assert.match(
+      mini.textOf(nodesByClass(card, 'dshmem_hud_time')[0]),
+      /更新于 \d{4}-\d{2}-\d{2} \d{2}:\d{2}/,
+      '更新时间应独立成一行元信息',
+    );
+
     const body = mini.textOf(card);
     assert.match(body, /本会话记住了 1 条/, '摘要应以条数开头');
     assert.match(body, /会话卡已沉淀/, '缺少本会话已沉淀记忆');
@@ -2972,6 +3036,52 @@ await test('前台会话卡：切换对话后只显示新会话', async () => {
   const body = mini.textOf(card);
   assert.match(body, /别的会话记忆/, '应换成新会话的记忆');
   assert.doesNotMatch(body, /会话卡已沉淀/, '不应继续显示上一个会话的记忆');
+});
+
+await test('前台会话卡：图标大小读本机偏好，越界 / 坏值夹回安全区间', async () => {
+  sessionNodes.length = 0;
+  sessionNodes.push(conversationNode('s-hud'));
+  storage.set('dsh-memory/session-hud/open', '1');
+  const hud = slotRegistrations.get('shell.overlay');
+  const iconVar = async () => {
+    const handle = mini.render(mini.react.createElement(hud.component, { t: makeT('zh') }));
+    await settle(12);
+    const card = nodesByClass(handle.tree, 'dshmem_hud_card')[0];
+    return String(card?.props?.style?.['--dshmem-hud-icon'] || '');
+  };
+  try {
+    storage.set('dsh-memory/session-hud/icon-size', '34');
+    assert.equal(await iconVar(), '34px', '应读本机存的图标大小');
+    storage.set('dsh-memory/session-hud/icon-size', '999');
+    assert.equal(await iconVar(), '40px', '越界值应夹到上限');
+    storage.set('dsh-memory/session-hud/icon-size', '3');
+    assert.equal(await iconVar(), '14px', '过小值应夹到下限');
+    storage.set('dsh-memory/session-hud/icon-size', 'oops');
+    assert.equal(await iconVar(), '20px', '坏值应回落到默认 20px');
+  } finally {
+    storage.delete('dsh-memory/session-hud/icon-size');
+  }
+});
+
+await test('前台会话卡：空态给「还没有」+「下一步」两行，固定高度时居中', async () => {
+  sessionNodes.length = 0;
+  sessionNodes.push(conversationNode('s-empty'));
+  storage.set('dsh-memory/session-hud/open', '1');
+  settingsValue.hudHeight = 300;
+  const hud = slotRegistrations.get('shell.overlay');
+  const handle = mini.render(mini.react.createElement(hud.component, { t: makeT('zh') }));
+  try {
+    await settle(12);
+    const card = nodesByClass(handle.tree, 'dshmem_hud_card')[0];
+    const empty = nodesByClass(card, 'dshmem_hud_empty')[0];
+    assert.ok(empty, '空态应有独立容器');
+    assert.equal(nodesByClass(empty, 'dshmem_hud_emptyTitle').length, 1, '空态缺少结论行');
+    assert.equal(nodesByClass(empty, 'dshmem_hud_emptyHint').length, 1, '空态缺少下一步提示');
+    assert.equal(card.props['data-size'], 'fixed', '固定高度应打开内部滚动布局');
+  } finally {
+    settingsValue.hudHeight = 0;
+    storage.delete('dsh-memory/session-hud/open');
+  }
 });
 
 /* ------------------------------------------------------------------ *

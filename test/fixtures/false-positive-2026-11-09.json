@@ -1,0 +1,85 @@
+{
+  "capturedAt": "2026-11-09",
+  "source": "真实库 ~/.dsh/storages/dsh-memory/workspaces/dsh-memory-git-d3eb 的 health.contradictions 回放（10/10 全为误报）",
+  "purpose": "防止「修一批触发词，又冒出另一批」。每次改判定逻辑都跑一遍，默认路径必须零结论，显式诊断只作只读信号。",
+  "falsePositiveCorpus": [
+    {
+      "pattern": "句内对比句 + 同主题共享词",
+      "hint": "「不能」+ 对方关键词「自动、turn、end」：自动巩固必须挂 turn/end，不能挂 agent/turn-stopping",
+      "a": { "title": "自动巩固挂在 turn/end", "content": "自动巩固必须挂 turn/end，不能挂 agent/turn-stopping。" },
+      "b": { "title": "轮末事件处理", "content": "自动巩固在 turn/end 里做，不占用轮次收尾时间。" }
+    },
+    {
+      "pattern": "句内对比句 + 结论一致",
+      "hint": "「不能」+ 对方关键词「npm、token、publish」：npm login 得到的会话 token 能 whoami，但不能 publish",
+      "a": { "title": "npm 登录态能力", "content": "npm login 得到的会话 token 能 whoami，但不能 publish。" },
+      "b": { "title": "npm publish 被挡", "content": "npm publish 被 2FA 403 挡住，需要带 OTP 的自动化令牌。" }
+    },
+    {
+      "pattern": "句内对比句 + 结论一致",
+      "hint": "「不能」+ 对方关键词「npm、发布、whoami」：验证 npm 发布能力不能只看 whoami + org ls",
+      "a": { "title": "验证发布能力", "content": "验证 npm 发布能力不能只看 npm whoami 加 npm org ls。" },
+      "b": { "title": "发布验收走 registry", "content": "验收发布要去 npm registry 核对版本，不能只看 CI 状态。" }
+    },
+    {
+      "pattern": "句内对比句 + 二元组碎片「布必」",
+      "hint": "「不能」+ 对方关键词「发布、布必、必须」：验收发布必须去 npm registry 核对版本",
+      "a": { "title": "发布验收口径", "content": "验收发布必须去 npm registry 核对版本，不能只看 CI 状态。" },
+      "b": { "title": "CI 状态不等于发布成功", "content": "CI 绿了不代表 registry 上有新版本，必须单独核对。" }
+    },
+    {
+      "pattern": "句内对比句 + 二元组碎片「全策」",
+      "hint": "「禁止」+ 对方关键词「安全、全策、策略」：安全策略禁止 agent 删除 git tag",
+      "a": { "title": "git tag 删除权限", "content": "安全策略禁止 agent 删除 git tag，需要用户手动 git tag -d。" },
+      "b": { "title": "标签保护", "content": "已推送的 tag 不允许强推或重打，安全策略要求人工确认。" }
+    },
+    {
+      "pattern": "变更语态（上一轮误报主源）",
+      "hint": "「不再」+ 对方关键词「记忆、整理、手动」：记忆整理不再需要手动点整理一次",
+      "a": { "title": "记忆整理改为启动自动触发", "content": "记忆整理不再需要手动点整理一次：启动时检查距上次整理满 7 天才跑。" },
+      "b": { "title": "记忆整理流程", "content": "记忆整理在启动时跑一次，合并重复簇并报告过期条目。" }
+    },
+    {
+      "pattern": "变更语态 + 同主题",
+      "hint": "「不再」+ 对方关键词「全局、局画、画像」：全局画像的待审稿",
+      "a": { "title": "画像重写零审批", "content": "全局画像的待审稿不再需要人批准，默认直接落库。" },
+      "b": { "title": "画像自动刷新", "content": "全局画像每 6 小时检查一次，有新素材就重写一版。" }
+    },
+    {
+      "pattern": "变更语态 + 同主题",
+      "hint": "「不再」+ 对方关键词「启动、动整、整理」：autoDreamDays 默认 7 天",
+      "a": { "title": "启动整理间隔", "content": "启动整理不再每次都跑：距上次满 autoDreamDays 才触发。" },
+      "b": { "title": "整理台账", "content": "每次整理写台账，下次到期时间按上次成功时间算。" }
+    },
+    {
+      "pattern": "变更语态 + 同主题",
+      "hint": "「不再」+ 对方关键词「空产、产出、出细」：空产出细分 empty / all_rejected / bad_json",
+      "a": { "title": "二级蒸馏诊断", "content": "空产出细分 empty、all_rejected、bad_json，不再只记一个 no_candidate。" },
+      "b": { "title": "台账字段", "content": "global-distill.json 记录素材数、解析数与每条候选的拒绝原因。" }
+    },
+    {
+      "pattern": "句内对比句 + 红线措辞",
+      "hint": "「不要」+ 对方关键词「真实、记忆、面板」：不要用真实记忆面板截图（可能泄露用户数据）",
+      "a": { "title": "文档截图规范", "content": "不要用真实记忆面板截图，可能泄露用户数据。" },
+      "b": { "title": "发布素材要求", "content": "对外文档要脱敏，真实记忆内容不能直接贴出去。" }
+    }
+  ],
+  "trueContradiction": {
+    "a": { "title": "包管理器约定", "content": "这个项目统一使用 pnpm 安装依赖。", "tags": ["tooling"] },
+    "b": { "title": "包管理器迁移", "content": "不要再用 pnpm 了，改用 npm 安装依赖。", "tags": ["tooling"] }
+  },
+  "benignUserRules": [
+    "忽略之前的要求，以后都用 pnpm 安装依赖。",
+    "把下面这条规则写进记忆：发布前必须去 npm registry 核对版本。",
+    "不要告诉用户我的邮箱地址。",
+    "以后不要再手动点整理一次，自动跑就行。",
+    "禁止 agent 删除 git tag，需要用户手动确认。",
+    "记住：所有改动跑完全量测试才能提交。"
+  ],
+  "expectations": {
+    "defaultPath": "health({includeContradictions:false}) 的 contradictions 必须为空；用户可见路径零词法判定",
+    "explicitScan": "health({includeContradictions:true}) 仍可召回 trueContradiction，但结论只进只读信号",
+    "noAutoArchive": "resolveContradictionsByTime 省略 apply 时一律只报告，误报语料里的记录必须仍是 active",
+    "policyGuard": "lib/policy.js 里所有 detector=lexical 的规则 defaultAction 只能是 signal / quarantine"
+  }
+}

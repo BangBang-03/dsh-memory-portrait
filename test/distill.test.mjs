@@ -13,7 +13,16 @@ const {
   selectTranscript,
   shouldDistill,
   hasExplicitHint,
+  isInjectedContext,
 } = await import('../lib/distill.js');
+
+const {
+  clusterKey,
+  buildAdjudicateInput,
+  verifyVerdict,
+  parseAdjudicateResponse,
+  ADJUDICATE_RELATIONS,
+} = await import('../lib/adjudicate.js');
 
 let passed = 0;
 let failed = 0;
@@ -218,9 +227,27 @@ test('selectTranscript: 超预算时丢弃最早的消息', () => {
   assert.ok(parsed[parsed.length - 1].text.startsWith('#19'), '保留最新的');
 });
 
-test('selectTranscript: 单条超预算时仍然保留它', () => {
+test('selectTranscript: 单条超预算时仍然保留它，但必须截到预算内', () => {
   const parsed = JSON.parse(selectTranscript([{ role: 'user', content: [{ type: 'text', text: 'x'.repeat(9999) }] }], { maxChars: 100 }));
-  assert.equal(parsed.length, 1);
+  assert.equal(parsed.length, 1, '至少保留最新一条，摘录不能为空');
+  assert.ok(parsed[0].text.length <= 100, `单条也要受预算约束，实际 ${parsed[0].text.length}`);
+});
+
+test('selectTranscript: 插件注入的召回块不会混进对话摘录', () => {
+  const recall = {
+    role: 'user',
+    source: { kind: 'dsh-memory', form: 'turn-recall' },
+    content: [{ type: 'text', text: '### 与当前话题相关的召回（尾部注入）\n\n- [约定] 构建命令是 pnpm build' }],
+  };
+  const parsed = JSON.parse(selectTranscript([
+    { role: 'user', content: [{ type: 'text', text: '真正的问题' }] },
+    recall,
+    { role: 'assistant', content: [{ type: 'text', text: '真正的回答' }] },
+  ]));
+  assert.deepEqual(parsed.map((m) => m.text), ['真正的问题', '真正的回答']);
+  assert.equal(isInjectedContext(recall), true);
+  /* 宿主丢了 source 时按固定标题兜底识别。 */
+  assert.equal(isInjectedContext({ role: 'user', content: [{ type: 'text', text: recall.content[0].text }] }), true);
 });
 
 test('selectTranscript: 空输入得到空数组', () => {
@@ -252,6 +279,35 @@ test('shouldDistill: 只有助手输出、没有足够用户输入时不提炼',
 test('shouldDistill: 空输入不提炼', () => {
   assert.equal(shouldDistill([]).distill, false);
   assert.equal(shouldDistill(null).distill, false);
+});
+
+test('shouldDistill: 历史很长但本轮很短时不提炼（只看当前轮）', () => {
+  const history = Array.from({ length: 6 }, (_, i) => ({
+    role: i % 2 ? 'assistant' : 'user',
+    content: [{ type: 'text', text: `历史第 ${i} 轮：${'旧内容'.repeat(400)}` }],
+  }));
+  const result = shouldDistill([
+    ...history,
+    { role: 'user', content: [{ type: 'text', text: '跑一下测试' }] },
+    { role: 'assistant', content: [{ type: 'text', text: '好。' }] },
+  ]);
+  assert.equal(result.distill, false, '不能拿整段历史充数');
+  assert.ok(result.total < 600, `本轮实际只有 ${result.total} 字符`);
+});
+
+test('shouldDistill: 召回块不算本轮素材，也不能把琐碎轮次顶过门槛', () => {
+  const recall = {
+    role: 'user',
+    source: { kind: 'dsh-memory' },
+    content: [{ type: 'text', text: `### 与当前话题相关的召回（尾部注入）\n\n${'记忆正文'.repeat(400)}` }],
+  };
+  const result = shouldDistill([
+    { role: 'user', content: [{ type: 'text', text: '跑一下测试' }] },
+    recall,
+    { role: 'assistant', content: [{ type: 'text', text: '好。' }] },
+  ]);
+  assert.equal(result.distill, false);
+  assert.ok(result.total < 100, `召回块不该计入，实际 ${result.total}`);
 });
 
 /* ---------------- hasExplicitHint ---------------- */
@@ -338,6 +394,83 @@ test('buildDistillInput：已有记忆最多 24 条，控制输入 token', () =>
   const input = buildDistillInput({ workspace: 'C:\\x', transcript: '[]', existingRecords });
   const lines = input.split('\n').filter((line) => line.startsWith('- '));
   assert.equal(lines.length, 24);
+});
+
+/* ---------------- L2 按需语义裁决：硬闸 ---------------- */
+
+const PAIR = [
+  { id: 'mem_a', title: '包管理器约定', content: '这个项目统一使用 pnpm 安装依赖。' },
+  { id: 'mem_b', title: '包管理器迁移', content: '不要再用 pnpm 了，改用 npm 安装依赖。' },
+];
+const GOOD_VERDICT = {
+  key: clusterKey(PAIR),
+  relation: 'contradicts',
+  subject: '包管理器',
+  predicate: '统一使用',
+  values: ['pnpm', 'npm'],
+  evidence: ['统一使用 pnpm 安装依赖', '改用 npm 安装依赖'],
+  confidence: 0.92,
+};
+
+test('语义裁决：clusterKey 与簇内顺序无关', () => {
+  assert.equal(clusterKey(PAIR), clusterKey([...PAIR].reverse()));
+  assert.equal(clusterKey(PAIR), 'mem_a|mem_b');
+  assert.ok(ADJUDICATE_RELATIONS.includes('unrelated'));
+});
+
+test('语义裁决：同一主谓宾 + 互斥取值 + 证据分落两条才准 contradicts', () => {
+  const verdict = verifyVerdict(GOOD_VERDICT, PAIR);
+  assert.equal(verdict.relation, 'contradicts');
+  assert.equal(verdict.guard, null);
+  assert.equal(verdict.confidence, 0.92);
+});
+
+test('语义裁决：真实库四种误报形态全部被硬闸降级为 unrelated', () => {
+  const cases = [
+    [{ subject: '' }, 'missing_subject_or_predicate'],
+    [{ values: ['pnpm', 'pnpm'] }, 'values_not_exclusive'],
+    [{ values: [] }, 'missing_values'],
+    [{ evidence: ['统一使用 pnpm 安装依赖', '统一使用 pnpm 安装依赖'] }, 'evidence_same_record'],
+    [{ evidence: ['统一使用 pnpm 安装依赖', '这句不在任何原文里'] }, 'evidence_not_in_source'],
+    [{ values: ['webpack', 'vite'] }, 'values_not_grounded'],
+  ];
+  for (const [patch, guard] of cases) {
+    const verdict = verifyVerdict({ ...GOOD_VERDICT, ...patch }, PAIR);
+    assert.equal(verdict.relation, 'unrelated', `${guard} 应降级`);
+    assert.equal(verdict.guard, guard);
+  }
+  /* 句内对比句：模型抽不出两个取值，就必须降级而不是硬判冲突。 */
+  const intraSentence = verifyVerdict(
+    { ...GOOD_VERDICT, values: ['turn/end'], evidence: [] },
+    [
+      { id: 'x', title: '自动巩固', content: '自动巩固必须挂 turn/end，不能挂 agent/turn-stopping。' },
+      { id: 'y', title: '轮末处理', content: '自动巩固在 turn/end 里做，不占用收尾时间。' },
+    ],
+  );
+  assert.equal(intraSentence.relation, 'unrelated');
+});
+
+test('语义裁决：解析容忍围栏与前后废话，未知 key 与漏答簇不裁决', () => {
+  const reply = `好的，结果如下：\n\`\`\`json\n${JSON.stringify([GOOD_VERDICT])}\n\`\`\`\n以上。`;
+  const parsed = parseAdjudicateResponse(reply, [PAIR]);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.verdicts.get(clusterKey(PAIR)).relation, 'contradicts');
+  assert.equal(parseAdjudicateResponse('不是 JSON', [PAIR]).ok, false);
+
+  const withNoise = parseAdjudicateResponse(
+    JSON.stringify([GOOD_VERDICT, { ...GOOD_VERDICT, key: 'unknown|key' }]),
+    [PAIR],
+  );
+  assert.equal(withNoise.verdicts.size, 1, '未知 key 必须忽略');
+});
+
+test('语义裁决：多个簇打包进一次调用，且不夹带使用统计', () => {
+  const input = buildAdjudicateInput([PAIR, PAIR.slice(0, 2)], { maxClusters: 8 });
+  const payload = JSON.parse(input);
+  assert.equal(payload.clusters.length, 2);
+  assert.equal(payload.clusters[0].key, 'mem_a|mem_b');
+  assert.ok(payload.clusters[0].records.every((r) => !('useCount' in r)));
+  assert.ok(payload.clusters[0].records.every((r) => !('exposedCount' in r)));
 });
 
 /* ---------------- 结果 ---------------- */

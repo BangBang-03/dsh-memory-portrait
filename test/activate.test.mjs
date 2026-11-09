@@ -95,7 +95,7 @@ function createFakeCtx(services = {}) {
  * block-start / text-delta / block-end / finish。每次调用把 options 记进 seen，
  * 方便断言 provider/model 路由确实跟着会话走。
  */
-function fakeLlm(reply, seen = []) {
+function fakeLlm(reply, seen = [], modelInfo = null) {
   return {
     stream(options) {
       seen.push(options);
@@ -110,6 +110,7 @@ function fakeLlm(reply, seen = []) {
         for (const chunk of chunks) yield chunk;
       })();
     },
+    ...(modelInfo ? { resolveModelInfo: async () => modelInfo } : {}),
   };
 }
 
@@ -560,7 +561,13 @@ await test('Config 的默认值落到运行时设置里，且能被 settings.jso
 
 await test('接了 llm 服务：粘贴文本提炼出候选，且不落库', async () => {
   const seen = [];
-  const { calls, route, session } = activate({ services: { llm: fakeLlm(DISTILL_REPLY, seen) } });
+  const { calls, route, session } = activate({
+    services: {
+      llm: fakeLlm(DISTILL_REPLY, seen, {
+        reasoning: { efforts: [{ id: 'off' }, { id: 'low' }, { id: 'high' }, { id: 'max' }] },
+      }),
+    },
+  });
   calls.events.find(([name]) => name === 'session/created')[1](session);
 
   const result = await callRoute(route, {
@@ -582,6 +589,8 @@ await test('接了 llm 服务：粘贴文本提炼出候选，且不落库', asy
   assert.equal(seen[0].sessionId, 'session-1');
   assert.equal(seen[0].messages[0].role, 'user');
   assert.ok(seen[0].system.length > 0);
+  /* 辅助调用取第二低档：主会话是 max 时，1200 的 maxTokens 不会被 reasoning 全吃掉。 */
+  assert.equal(seen[0].reasoningEffort, 'low');
 
   // 提炼只是预览，不该写进记忆。
   const list = await callRoute(route, { url: `/memory/api/list?workspace=${encodeURIComponent(workspace)}` });
@@ -695,7 +704,7 @@ await test('轮次结束的自动提炼：开着的时候后台真的落库', as
   assert.equal(state.body.captures[0].saved, 1);
 });
 
-await test('轮次结束的自动提炼：对话太短就直接跳过，不烧 token', async () => {
+await test('轮次结束的自动提炼：历史很长但本轮很短就直接跳过，不烧 token', async () => {
   const seen = [];
   const { calls, route, session, messages } = activate({
     services: { llm: fakeLlm(DISTILL_REPLY, seen) },
@@ -703,6 +712,15 @@ await test('轮次结束的自动提炼：对话太短就直接跳过，不烧 t
     captureCooldownMs: 0,
   });
   messages.length = 0;
+  /* 历史足够长、还带一段召回块：按「整段对话」算是过闸的，按「当前轮」算就该跳过。 */
+  for (let i = 0; i < 4; i += 1) {
+    messages.push({ role: i % 2 ? 'assistant' : 'user', content: [{ type: 'text', text: `历史第 ${i} 轮：${'旧内容'.repeat(300)}` }] });
+  }
+  messages.push({
+    role: 'user',
+    source: { kind: 'dsh-memory' },
+    content: [{ type: 'text', text: `### 与当前话题相关的召回（尾部注入）\n\n${'记忆正文'.repeat(300)}` }],
+  });
   messages.push({ role: 'user', content: [{ type: 'text', text: '今天天气' }] });
 
   const onEvent = calls.events.find(([name]) => name === 'session/event')[1];
@@ -713,7 +731,7 @@ await test('轮次结束的自动提炼：对话太短就直接跳过，不烧 t
     return state.body.captures.length > 0;
   });
   assert.ok(logged, '跳过也要留痕');
-  assert.equal(seen.length, 0, '太短就不该调用 LLM');
+  assert.equal(seen.length, 0, '历史与召回块都不该把本轮顶过门槛');
   const state = await callRoute(route, { url: `/memory/api/state?workspace=${encodeURIComponent(workspace)}` });
   assert.equal(state.body.captures[0].reason, 'too_short');
 });
@@ -1053,6 +1071,37 @@ await test('会话索引与溯源：turn/end 落原文，action=sessions 搜回�
   assert.equal(miss.count, 0, '无命中时明说');
 });
 
+await test('会话索引：尾部召回块不会被当成用户发言写进索引（避免自我召回）', async () => {
+  const { calls, tool, exec, session } = activate({ briefing: false });
+  calls.events.find(([name]) => name === 'session/created')[1](session);
+  const onEvent = calls.events.find(([name]) => name === 'session/event')[1];
+  await tool.execute(
+    { action: 'save', title: '构建命令是 pnpm build', content: '改完客户端半要重跑 pnpm build。', category: 'convention' },
+    exec,
+  );
+
+  const realUser = { role: 'user', content: [{ type: 'text', text: '帮我跑一下构建命令' }], source: { kind: 'user' } };
+  session.deriveMessages = () => [realUser, { role: 'assistant', content: [{ type: 'text', text: '好的' }] }];
+  onEvent(session, { type: 'turn/end', turn: 1 });
+
+  const entered = await runPreStep(calls, { agent: { session }, messages: [realUser], turn: 2, step: 1 });
+  const tail = entered.messages.find((message) => message?.source?.kind === 'dsh-memory');
+  assert.ok(tail, '应先注入一条尾部召回，作为后续断言的前提');
+
+  /* 宿主把召回消息落进历史后，它成了最后一条 user 消息；turn/end 不能拿它当「本轮用户发言」。 */
+  session.deriveMessages = () => [
+    realUser,
+    tail,
+    { role: 'assistant', content: [{ type: 'text', text: '已经跑完了' }] },
+  ];
+  onEvent(session, { type: 'turn/end', turn: 2 });
+
+  const polluted = await tool.execute({ action: 'sessions', query: '与当前话题相关的召回' }, exec);
+  assert.equal(polluted.count, 0, '召回块的标题不该出现在会话索引里');
+  const original = await tool.execute({ action: 'sessions', query: '帮我跑一下构建命令' }, exec);
+  assert.ok(original.count >= 1, '真正的用户发言仍然要能搜回来');
+});
+
 await test('程序记忆晋升：action=promote 写进 AGENTS.md 托管块，重复晋升幂等', async () => {
   const { tool, exec } = activate({ briefing: false });
   const saved = await tool.execute(
@@ -1390,11 +1439,22 @@ await test('注入审计：简报与尾部召回都留下可复算的字节、ha
   assert.ok(tail.ids.length >= 1, '尾部召回应记下 id');
 });
 
-await test('captureMode=draft：自动提炼先进队列，批准后才生效', async () => {
+await test('captureMode=draft：低置信候选才进队列，批准后才生效', async () => {
+  /* 0.5 过得了 minConfidence（0.2），但过不了自动批准线（0.6）——应当留队等人。 */
+  const lowConfidence = JSON.stringify([
+    {
+      title: '插件基调用 DeepSeek 鲸鱼蓝',
+      content: 'UI 视觉基调用 #4d6bfe，浅色与深色都成立。',
+      category: 'preference',
+      tags: ['ui', 'color'],
+      confidence: 0.5,
+    },
+  ]);
   const { calls, route, session } = activate({
-    services: { llm: fakeLlm(DISTILL_REPLY) },
+    services: { llm: fakeLlm(lowConfidence) },
     autoCapture: true,
     captureMode: 'draft',
+    minConfidence: 0.2,
     captureCooldownMs: 0,
     autoCaptureMinChars: 100,
   });
@@ -1430,6 +1490,50 @@ await test('captureMode=draft：自动提炼先进队列，批准后才生效', 
   const listAfter = await callRoute(route, { url: `/memory/api/list${q}` });
   assert.equal(listAfter.body.records.length, 1, '批准后进默认列表');
   assert.equal(listAfter.body.records[0].title, '插件基调用 DeepSeek 鲸鱼蓝');
+});
+
+await test('captureMode=review：高置信候选自动转正，不堆待审队列', async () => {
+  const { calls, route, session } = activate({
+    services: { llm: fakeLlm(DISTILL_REPLY) },
+    autoCapture: true,
+    captureMode: 'review',
+    captureCooldownMs: 0,
+    autoCaptureMinChars: 100,
+  });
+  const onEvent = calls.events.find(([name]) => name === 'session/event')[1];
+  const q = `?workspace=${encodeURIComponent(workspace)}`;
+
+  onEvent(session, { type: 'turn/end' });
+
+  const visible = await waitFor(async () => {
+    const list = await callRoute(route, { url: `/memory/api/list${q}` });
+    return list.body.records.length > 0;
+  });
+  assert.ok(visible, '高置信候选应直接进默认列表');
+  const queue = await callRoute(route, { url: `/memory/api/queue${q}` });
+  assert.equal(queue.body.records.length, 0, '低风险候选不该堆进待审队列');
+});
+
+await test('captureMode=draft：高置信候选也必须进队列（C6 语义边界）', async () => {
+  const { calls, route, session } = activate({
+    services: { llm: fakeLlm(DISTILL_REPLY) },
+    autoCapture: true,
+    captureMode: 'draft',
+    captureCooldownMs: 0,
+    autoCaptureMinChars: 100,
+  });
+  const onEvent = calls.events.find(([name]) => name === 'session/event')[1];
+  const q = `?workspace=${encodeURIComponent(workspace)}`;
+
+  onEvent(session, { type: 'turn/end' });
+
+  const queued = await waitFor(async () => {
+    const queue = await callRoute(route, { url: `/memory/api/queue${q}` });
+    return queue.body.records.length > 0;
+  });
+  assert.ok(queued, 'draft 模式下所有模型产出都必须进队列');
+  const list = await callRoute(route, { url: `/memory/api/list${q}` });
+  assert.equal(list.body.records.length, 0, '未批准的候选不得直接生效');
 });
 
 await test('工具 save 带 supersedes：旧条归档，get 展示版本链', async () => {
@@ -2024,7 +2128,7 @@ await test('画像重写：两次都解析不了时给出可读明细（不是�
   assert.ok(warned.length >= 1, '失败要在宿主日志里留摘要');
 });
 
-await test('画像重写：输出被截断时不直写，改送待审等人确认', async () => {
+await test('画像重写：输出被截断时也直接落库（零审批），只标 degraded', async () => {
   const seen = [];
   const truncated = '{"sections":[{"key":"background","text":"- 半句话';
   const { calls, route, session } = activate({ services: { llm: seqLlm([truncated], seen) } });
@@ -2042,12 +2146,12 @@ await test('画像重写：输出被截断时不直写，改送待审等人确�
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   assert.equal(res.body.degraded, 'truncated');
-  assert.equal(res.body.drafted, true, '有损输出不能直写，得进待审');
+  assert.equal(res.body.drafted, false, '有损输出同样直接落库，不再等人批准');
   assert.equal(seen.length, 1, '能解析出来就不必重试');
 
   const state = await callRoute(route, { url: '/memory/api/portrait' });
-  assert.equal(state.body.draft, true, '待审稿应在');
-  assert.equal(state.body.global.version, 1, '批准前画像不变');
+  assert.equal(state.body.draft, false, '零审批路径下不应产生待审稿');
+  assert.equal(state.body.global.version, 2, '有损输出也落库，版本 +1（可回滚上一版）');
 });
 
 await test('journal API：写与读、空文本 400、指定日期校验', async () => {

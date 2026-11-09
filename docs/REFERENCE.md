@@ -11,7 +11,7 @@
 
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-673%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-701%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 DSH 的**工作区长期记忆**插件。对标 Qoder / WorkBuddy / ZCode 的记忆交互：记忆以当前工作区为单位落库，
 会话开始时把最重要的几条以**索引**形式注入系统提示（一行一条，正文按需用 `memory` 工具取，省 token），
@@ -53,7 +53,7 @@ pwsh -File install.ps1 -FromUrl https://github.com/BangBang-03/dsh-memory-portra
 市场元数据在 `package.json` 的 `dsh.marketplace` / `dsh.permissions`：声明 web / desktop、安装后需重启、桌面端有手动步骤；权限为本地读写、无外发网络、仅调用本地 `git` 做工作区身份识别。兼容口径用 `node tools/check-compat.mjs [--npm]` 核对 README、`package.json` 与 npmjs 已发布清单。headless / TUI 尚未做端到端验证，暂不声明。
 
 - 宿主半 `lib/index.js`：系统提示注入（索引/全文双模式）、轮末相关召回、`memory` 工具、`/memory/api` 路由、轮次结束自动提炼、打开 DSH 后的启动整理、自动刷新全局画像（WorkBuddy 式主路径）。
-- 客户端半 `lib/client.js`：设置面板里的「记忆」页，五个 tab——**项目记忆 / 全局记忆 / 红线**（范围由顶部页签决定：项目页只列本工作区条目与写入工具，全局页放全局画像与全局条目，红线页单列全部绝对禁令（跨范围，不跟页签的 scope 走）；条目区不再藏在抽屉里，档案 / 列表两种切法直接铺在页签里，库为空时换成「怎么开始」的引导卡）、**维护**（按系统状态 / 需要我处理 / 自动提炼 / 历史记录排，后者默认收起）、**设置**（顶部是只读的「记忆概览」——条数、项目/全局占比、类别分布、近 7 天新增、注入预算与画像覆盖（走 `GET /overview` 聚合端点，覆盖全部 active 记录，不为画图拉明细）；下面是「显示与视图」（默认视图 / 档案排布 / 列表密度 / 画像卡、统计行、变化横幅三个开关，只落本机 localStorage，不进宿主配置），再往下是注入 / 记录 / 二级蒸馏 / 治理 / 高级与数据五组，保存条吸底）。另有前台会话记忆卡：挂在宿主 `shell.overlay` 上的右下角悬浮卡，采用图标 + 「更新于 YYYY-MM-DD HH:MM」+ 一段话摘要（把本会话沉淀的记忆标题连成一句，草稿与归档不可见）；图标由 `hudIcon` 选择（`a` 官方鲸鱼标默认，`b` 官方 App 图标，`c`–`g` 为二创位图）；尺寸 / 背景不透明度 / 背景色由 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor` 控制，设置页「会话卡外观」用滑杆与取色器调，拖卡片右下角也能改大小（松手写回配置）；可收起 / 拖拽，位置与展开状态存本地；设置页的「该对话记忆」可按对话关闭。卡片只属于当前可见对话：宿主设置弹窗打开、切到插件 / 自动化任务主面板或没有 `[data-conversation-session]` 时整卡隐藏，切换会话时重新拉新会话摘要；弹窗开合与会话 attr 变化走 `MutationObserver`，另有 1 秒兜底轮询。
+- 客户端半 `lib/client.js`：设置面板里的「记忆」页，五个 tab——**项目记忆 / 全局记忆 / 红线**（范围由顶部页签决定：项目页只列本工作区条目与写入工具，全局页放全局画像与全局条目，红线页单列全部绝对禁令（跨范围，不跟页签的 scope 走）；条目区不再藏在抽屉里，档案 / 列表两种切法直接铺在页签里，库为空时换成「怎么开始」的引导卡）、**维护**（按系统状态 / 需要我处理 / 自动提炼 / 历史记录排，后者默认收起）、**设置**（顶部是只读的「记忆概览」——条数、项目/全局占比、类别分布、近 7 天新增、注入预算与画像覆盖（走 `GET /overview` 聚合端点，覆盖全部 active 记录，不为画图拉明细）；下面是「显示与视图」（默认视图 / 档案排布 / 列表密度 / 画像卡、统计行、变化横幅三个开关，只落本机 localStorage，不进宿主配置），再往下是注入 / 记录 / 二级蒸馏 / 治理 / 高级与数据五组，保存条吸底）。另有前台会话记忆卡：挂在宿主 `shell.overlay` 上的右下角悬浮卡，头部是「六点拖动柄 + 图标底托 + 标题 + 收起」，下面一行「更新于 YYYY-MM-DD HH:MM」，再往下是本会话沉淀的记忆摘要（标题连成一句，草稿与归档不可见）；空库时换成「还没有沉淀 + 聊几句后会出现」两行提示。图标由 `hudIcon` 选择（`a` 官方鲸鱼标默认，`b` 官方 App 图标，`c`–`g` 为二创位图），大小 14–40px 可调（`dsh-memory/session-hud/icon-size`，本机偏好、不进宿主配置，设置页「会话卡外观」滑杆 + 实时预览）；尺寸 / 背景不透明度 / 背景色由 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor` 控制，设置页「会话卡外观」用滑杆与取色器调，拖卡片右下角也能改大小（松手写回配置）；可收起 / 拖拽（按住头部六点抓手或头区空白，指针捕获 + rAF 合并，松手才提交位置），位置与展开状态存本地；设置页的「该对话记忆」可按对话关闭。卡片只属于当前可见对话：宿主设置弹窗打开、切到插件 / 自动化任务主面板或没有 `[data-conversation-session]` 时整卡隐藏，切换会话时重新拉新会话摘要；弹窗开合与会话 attr 变化走 `MutationObserver`，另有 1 秒兜底轮询。
 - 纯逻辑层：`lib/store.js`（存储）、`lib/dream.js`（整理管线）、`lib/distill.js`（提炼）、`lib/api.js`（HTTP 契约），都不依赖 DSH，可独立测试。
 
 ## 新增：对齐市场同类后补的十六处
@@ -110,6 +110,12 @@ pwsh -File install.ps1 -FromUrl https://github.com/BangBang-03/dsh-memory-portra
 记忆默认**不落在仓库里**，不随 git 外泄；需要人类可读的副本或跨机器携带时打开 `mirror`，会在工作区写
 两份文件：`<工作区>/.dsh-memory/MEMORY.md`（Markdown，给人读，可以直接提交也可以 `.gitignore` 掉）
 与同目录的 `memory-snapshot.json`（结构化，保留 id / trust / confidence / supersedes，供另一台机器合并）。
+
+**时间轴字段（L1）**：每条记录带 `validFrom` / `validUntil` / `invalidatedBy`（事实何时生效、何时被新结论取代），
+另有 `contentUpdatedAt`（只有标题或正文真的改了才刷新）与 `systemTouchedAt`（任意系统元数据改写）。
+旧库读盘自动补默认窗口。`supersede` 关闭旧事实的有效窗口但保留记录（D7，可回滚）；
+简报与检索排序对已失效事实静态降权 0.3×——只判 `validUntil` 是否非空，不读当前时间（C4），
+所以「当时怎么做的」类提问仍能把它捞回来。快照携带 validity、不携带本机使用统计（D8）。
 `MEMORY.md` 按「离线也能读」组织：项目概况与当前关注来自工作区画像，随后是逐字保留的红线、置顶条目、
 按类别分组的约定。**全量渲染，不截断、不按日期拆文件**——WorkBuddy 的 MEMORY.md 能压到 50 行，
 是因为细节散在按日期切分的日志里；这里只有这一份文件承载全部，压缩就等于丢信息。文件头声明的是
@@ -328,7 +334,7 @@ pwsh -File uninstall.ps1 -PurgeStorage   # 连 ~/.dsh/storages/dsh-memory 一起
 ```powershell
 git checkout lab                       # 默认分支；平时只在这里动
 # …改代码…
-node test/run-all.mjs                  # 本机跑一遍：15 个套件 673 条断言
+node test/run-all.mjs                  # 本机跑一遍：15 个套件 701 条断言
 git add <改动的文件>; git commit -m "feat: …"   # 不要用 git add -A（.probe/ 是本地材料）
 
 $out = node tools/push.mjs --branch lab; $out   # 输出 base = 上一版在本地的对应提交
@@ -450,10 +456,12 @@ CI（`.github/workflows/publish.yml`）在 `lab` 分支推送时发 `-lab.<run_n
   工作区画像不再单独展示，只保留全局画像（自动刷新也只写全局）。
   重写结果解析有容错：模型把换行直接敲进 JSON 字符串、末尾留逗号、输出被截断、字符串引号没转义，
   这几种都能捞回来（`no_json` 不再是「重写必挂」的默认结局）；第一次没按 JSON 输出会用更严格的提示再试一次。
-  截断与整体坏掉属于**有损**抢救，结果一律改送待审、面板上标明有损，不静默覆盖你手写的画像。
-- **需要处理**：待审草稿 / 待确认矛盾 / 复审到期 / 过期未用 / 失效文件 / 超预算的合计；
-  点「查看全部」在首页展开收件箱：待审草稿可批准 / 拒绝，复审到期可标记已复审，
-  过期未用可全部归档；待确认矛盾与失效文件给「去整理」入口。没有待处理项时明确显示「没有需要处理的项」。
+  截断与整体坏掉属于**有损**抢救，结果同样直接落库（零审批），`degraded` 标记透传到面板提示，
+  损失由画像版本历史兜底（可回滚上一版）。只有把 `rewriteMode` 设成 `draft` 才会拦一道。
+- **需要处理**：只统计**插件不敢自动决、且后果不可逆**的两类——taint 隔离出的草稿、
+  连续两轮自动续期仍零引用的复审项。矛盾线索 / 过期未用 / 曝光未用 / 失效文件 / 超预算
+  都退出这个计数，它们放在维护页当诊断；插件自己能处置的（合并、续期、降权）不进待办。
+  没有待处理项时显示「自动维护中」，附一行说明哪些事已经由插件代劳。
 - **顶部页签**：项目记忆 / 全局记忆 / 红线 / 维护 / 设置。范围就是页签本身，不再有范围 chip；
   项目页只列本工作区条目（顶部可切换工作区，并预览该工作区的 MEMORY.md），全局页放全局画像与全局条目，红线页单独拉全量（含归档，渲染时滤掉）、
   按记录标 scope，不受页签过滤；项目与全局两页共用同一套条目渲染。
@@ -509,11 +517,11 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | `briefMode` | `"index"` | `index` 一行一条索引（省 token）；`full` 标题+正文摘录；`portrait` 全局画像全量（工作区画像已撤）+ 索引清单 |
 | `briefingLimit` | `12` | 注入条数上限（1–50） |
 | `briefingMaxChars` | `2000` | 注入字数上限（200–20000） |
-| `briefingRebuildMinNew` | `3` | 简报重算闸：同一会话内新增记录攒够几条才重算系统提示（1–50；`1` = 写一条就重算） |
-| `briefingRebuildCooldownMs` | `600000` | 简报重算闸（时间）：没攒够条数时，距上次重算满多少毫秒也重算一次（0–3600000；`0` = 有变化就重算） |
+| `briefingRebuildMinNew` | `3` | 简报重算闸：冷却结束后，新增记录攒够几条才重算系统提示（1–50；`1` = 冷却一过有一条就重算） |
+| `briefingRebuildCooldownMs` | `1800000` | 简报重算闸（硬间隔）：两次重算至少隔多少毫秒，冷却期内即使攒够条数也不重算；没有新增条目的变化最多等 2 个冷却周期（0–3600000；`0` = 不做速率限制） |
 | `portraitMaxChars` | `1400` | 画像注入的字数预算（工作区 + 全局合计；仅 `briefMode=portrait` 生效，200–8000） |
 | `discipline` | `true` | 注入「记忆纪律」一段（何时写什么、对话内指令触发规则） |
-| `rewriteMode` | `"direct"` | 画像重写写入方式：`direct` 直接落库；`draft` 先存待审稿，面板批准后才生效 |
+| `rewriteMode` | `"direct"` | 画像重写写入方式：`direct` 直接落库（默认，含模型输出有损的情况——版本历史可回滚）；`draft` 才先存待审稿 |
 | `journalDays` | `14` | 画像重写时读取最近多少天的日志作为原料（1–90） |
 | `turnRecall` | `true` | 轮末按当轮内容召回相关记忆进下一轮 |
 | `turnRecallLimit` | `3` | 每轮召回条数（1–10） |
@@ -526,12 +534,12 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | `hudColor` | `""` | 前台会话卡背景色（`#rgb` / `#rrggbb`）；空 = 跟随宿主主题。自定义底色时按亮度自动选深色 / 浅色文字 |
 | `autoCapture` | `false` | 轮次结束自动提炼 |
 | `autoDreamDays` | `7` | 启动整理：启动时与轮末检查当前（最近使用的）工作区，距上次（自动或手动）整理满 N 天就在后台整理一次；`0` 关闭（0–365）。没有常驻定时器 |
-| `autoDreamPortrait` | `false` | 自动整理（启动时）是否顺带重写画像；默认关——画像由 `autoPortraitHours` 自动刷新负责。手动 Dream 仍会刷新一版进待审 |
+| `autoDreamPortrait` | `false` | 自动整理（启动时）是否顺带重写画像；默认关——画像由 `autoPortraitHours` 自动刷新负责。手动 Dream 也会刷新一版，落库方式跟随 `rewriteMode`（默认直接生效） |
 | `globalDistill` | `true` | 二级蒸馏：把本项目记忆抽成「候选原则」写进全局候选池。**时机由模型决定**（`memory` 工具的 `distill-global` 动作，在一段工作告一段落时显式调用）；兜底是轮末——按候选原则的 `anchors` 判断「还有几条没提炼过」，再用下两行的自适应间隔控制频次。关掉只是不再往上抽，已进池的候选照常按门槛晋升 |
 | `globalDistillMinNew` | `3` | 二级蒸馏的素材门槛：还剩多少条**没被提炼过**的素材才值得再试一次。`feedback` / `constraint` / `preference` 未覆盖达到 2 条时也会触发——这几类单项目就能晋升，优先蒸馏 |
 | `globalDistillCooldownMinutes` | `15` | 二级蒸馏的基础间隔（分钟）。连续空跑按 2 倍指数退避（15m → 30m → 1h … 上限 24h），有产出就回到基础间隔；不是定时任务，素材门槛没过时连时间闸都不看 |
 | `autoPortraitHours` | `6` | 自动刷新全局画像：每 N 小时检查一次，有新素材时调用模型重写；`0` 关闭（0–168）。面板「立即刷新」只是兜底 |
-| `captureMode` | `"direct"` | `direct` 直接落库；`draft` 先进待审队列 |
+| `captureMode` | `"direct"` | `direct` 全自动落库；`review` 只把高风险候选（红线 / 命中注入 / 置信度 < 0.6）送待审；`draft` 严格全部进队列（C6） |
 | `staleDays` | `60` | 体检里「过期未用」的判定天数 |
 | `autoCaptureMinChars` | `600` | 太短的轮次不提炼 |
 | `captureCooldownMs` | `60000` | 两次提炼的最小间隔 |
@@ -570,7 +578,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | GET | `/redline/history` | 红线当前版本 + 旧版本列表 |
 | POST | `/redline/rollback` | 红线回滚（必须 `confirm: true`；当前版本先写回历史） |
 | POST | `/settings` | 写设置 |
-| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、待确认矛盾对（词法线索；Dream 只报告，逐对确认后才归档）、files 引用失效、overBudget 超预算信号（只报告）；另含 `maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态）、`candidates` / `candidateItems`（二级蒸馏候选池：待判定计数与明细）与 `globalDistill`（上次二级蒸馏：素材 / 解析 / 拒绝原因 / 脱敏摘要 / 自适应节奏与下次允许时间） |
+| GET | `/health` | 体检：重复簇、过期未用、断链、待审草稿数、files 引用失效、overBudget 超预算信号；**矛盾线索默认不产出**（真实库 10/10 误报），`?contradictions=1` 才显式诊断；另含 `attention`（唯一「需要处理」口径）、`dormant`（久未使用汇总）、`maintenance`（启动整理间隔 / 上次 / 下次 / 摘要、`autoPortraitHours` 与全局画像 `updatedAt`、运行态）、`candidates` / `candidateItems`（二级蒸馏候选池：待判定计数与明细）与 `globalDistill`（上次二级蒸馏：素材 / 解析 / 拒绝原因 / 脱敏摘要 / 自适应节奏与下次允许时间） |
 | POST | `/health/resolve` | 一键处理：`merge`（合并簇，可带 `title/category/tags/content` 覆盖合并稿；红线与矛盾对会被拒绝）/ `time-order`（对一对矛盾按时序归档旧条，红线 / 置顶 / 用户旧条 / 外部新条会被拒绝）/ `archive`（归档过期）/ `unlink`（摘除断链） |
 | GET | `/timeline` | 全部记忆（含归档、不含草稿）按更新时间倒序 |
 | GET | `/portrait` | 当前画像（工作区 + 全局）、版本列表、段落定义 |
@@ -578,7 +586,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | GET | `/portrait/history` | 画像版本列表（降序） |
 | GET | `/portrait/export` | **画像导出**（轻量）：全局画像（含版本历史）+ 全部红线；`POST /import` 识别该载荷自动回灌（导入即入画像） |
 | GET | `/portrait/diff` | 两个版本的逐段 diff（`from=previous` 默认，返回 `+`/`−` 行与摘要） |
-| POST | `/portrait/rewrite` | 触发画像重写（`scope=global` 为面板默认；`captureMode`/`rewriteMode` 决定直写或进待审） |
+| POST | `/portrait/rewrite` | 触发画像重写（`scope=global` 为面板默认；`rewriteMode` 决定直写或进待审，默认直写） |
 | POST | `/portrait/migrate` | 跨 App 迁移画像：粘贴其它应用 AI 按提示词总结的画像 JSON，与全局画像整合（LLM 整合，失败降级段落合并） |
 | GET | `/portrait/draft` | 读取待审重写稿（默认全局；`scope=workspace` 读工作区旧稿） |
 | POST | `/portrait/draft/approve` | 批准重写稿：落库、旧版留档、清待审文件 |
@@ -595,7 +603,7 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
 | POST | `/import-scan` | 按来源 id 或路径导入，用户级来源自动进全局库 |
 | GET | `/mirror` | 取当前工作区镜像的 Markdown |
 | POST | `/capture` | 立刻提炼一次（`captureMode` 决定落库还是进队列） |
-| POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 按词法线索报告矛盾（**不自动归档**，逐对确认走 `/health/resolve time-order`）+ 报告过期未用、二级蒸馏与全局原则晋升 + 画像重写进待审 |
+| POST | `/dream` | Dream 整理（手动补跑；与「启动整理」同一管线）：合并重复簇（红线不参与、置顶结果保持置顶）+ 复审到期自动续期（连两轮零引用才升级）+ 自动路径不扫矛盾、手动整理才产出只读线索 + 报告过期未用、二级蒸馏与全局原则晋升 + 画像重写（默认直接落库）。手动整理另做**一次**打包语义裁决：只有判 `duplicate` 的簇才合并，`contradicts` 必须给出同一主谓宾的互斥取值与分落两条的证据，否则强制回落 `unrelated`；无模型路由时静默跳过 |
 | POST | `/candidates/reject` | 「不再提议」：把候选原则标成 rejected，之后同主题不再晋升。`{ ids, reason? }` |
 | GET | `/sessions` | 会话检索（溯源）：按词重叠搜回当轮用户发言原文 + sessionId/turn |
 | GET | `/session-brief` | 前台会话卡的数据源：本会话沉淀的记忆 + 本会话用户诉求 + `hudIcon` 图标键 + `hud` 外观（`width` / `height` / `opacity` / `color`；卡片只展示记忆摘要；草稿与归档不可见）；按 `session` 精确过滤，不传时用最近活动会话兜底 |
@@ -631,7 +639,8 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
   断链（`related`/`supersedes` 指向不存在的记录，一键摘除）。
   `GET /health` 同时返回 `derivations`（失效的派生条目）与 `reviewDue`（到期未复审的条目），
   这两类在上面的派生链 / 复审队列两张卡里各自处理。
-- **待审队列**：`captureMode: draft` 时自动提炼的候选先进这里；每张草稿卡可**批准**、
+- **待审队列**：`draft` 严格全部进队列（C6 语义边界）；`review` 只收**高风险**候选
+  （红线候选 / 命中注入 / 置信度 < 0.6），普通候选当场转正——人工是兜底闸，不是审核工作。每张草稿卡可**批准**、
   **编辑后批准**（编辑字段随批准请求一起提交）、**拒绝**（默认删除，草稿从未生效）。
   草稿不进简报、不进检索、不进镜像——批准之前对模型完全不可见。tab 上带数量徽标。
 - **标签清理**：写法不同、意思相同的标签（`DSH` / `dsh` 这类大小写漂移）列成候选，
@@ -648,12 +657,21 @@ obsidian-second-brain 的「folder 定类型、tag 定检索、type 定实体」
   触发点是 `turn/end` 与会话销毁，没有常驻定时器；面板「立即刷新」只是兜底。
 - **Dream（手动补跑）**：一键半自动整理，与启动整理同一管线——
   合并重复簇（原条目归档可恢复；红线不参与，来源里只要有一条置顶，合并结果就保持置顶）、
-  **按词法线索报告矛盾**（只列出候选对，不自动归档；确认后在收件箱点「按时序归档旧条」，
+  **复审到期自动续期**（记 `autoReviewCount`、不写 `reviewedAt`；连两轮零引用才升级给人）、
+  **矛盾线索只做诊断**（列出候选对，不计数、不自动归档；想清理时在收件箱点「按时序归档旧条」，
   才保留新结论、归档旧结论并留下 `supersededBy` 回滚链接。词法线索会误报——真实库上出现过
-  把「竞争定位」和「autoCapture 默认值」判成矛盾的情况，所以自动整理不再碰这一项）、
-  报告过期未用（只报告不归档，由人决定）。手动跑还会顺带刷新一版画像（进待审），
-  但画像的正常更新由上面的自动刷新负责。
-  报告显示「合并几簇 / 待确认矛盾几条 / 过期几条 / 画像状态」。
+  把「竞争定位」和「autoCapture 默认值」判成矛盾的情况，所以自动整理不再碰这一项；
+  「不再 / 改用」这类变更语态已从否定词里拆出，只有对方仍在坚持旧断言时才算冲突）、
+  报告过期未用（只报告不归档，排序里本就按 decay 自动降权）。手动跑还会顺带刷新一版画像，
+  落库方式跟随 `rewriteMode`（默认直接生效）。
+  报告显示「合并几簇 / 复审续期几条 / 过期几条 / 画像状态」；自动整理不扫矛盾，
+  手动整理产出的矛盾线索只作只读诊断，既不进待办也不自动归档。
+  **语义裁决（L2）**：手动整理且存在高相似簇（Jaccard ≥ 0.72）时，所有簇打包成一次模型调用，
+  输出 `relation / subject / predicate / values / evidence / confidence`。判 `contradicts` 必须
+  给出同一主谓宾的两个互斥取值、两条 evidence 分别落在两条记录里且取值分别命中，
+  否则由 `verifyVerdict` 强制回落 `unrelated`——真实库上「句内对比句 / 同主题共享词 /
+  结论一致 / 二元组碎片」四类误报都被这道闸挡住。只有判 `duplicate` 的簇才允许合并；
+  无模型路由、JSON 坏掉或自动整理一律静默回落确定性规则。结论只影响合并决策，绝不自动归档。
   画像重写需要可用的模型会话：无会话 / 无原料 / 未启用 / 正在重写时显示「已跳过（原因）」，
   不计入失败；真实失败显示步骤与明细（明细是人话，不再只丢一个 `no_json`；宿主日志里另留一条脱敏摘要）。
   记录卡与时间线带写入安全徽标：`可疑`（taint）/ `已脱敏`（redactions）/ `外部来源`（trust=external），
@@ -709,9 +727,9 @@ cd <克隆下来的 dsh-memory 目录>
 npm test          # 或 node test/run-all.mjs
 ```
 
-15 个套件、673 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
+15 个套件、701 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
 
-- `store` 170 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
+- `store` 178 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
   工作区不存在时不造目录）、导入导出、并发写；v0.3.0：版本链 supersede/rollback、user 类别强制全局与跨库迁移、
   草稿四不可见、重复簇聚类与合并、体检（重复/过期/断链/草稿）、索引简报预算、镜像版本链线索、keywords 加权、unlink；
   v0.5.0：日志层 journal（按天 `journal/YYYY-MM-DD.md`、只追加，是画像重写的上游原料）、画像的读写与草稿；
@@ -739,19 +757,19 @@ npm test          # 或 node test/run-all.mjs
   再切一层、Qoder 索引页剔除、本机扫描只读；v0.6：来源扩到 Claude Code / Codex / Windsurf
   （递归扫 `~/.claude/projects/*/memory`、`~/.codex/memories`、`~/.codeium/windsurf/memories`，
   Claude 的索引页剔除）。
-- `distill` 42 项 —— 摘录裁剪、模型输出解析容错、触发条件、显式提示词识别；v0.3.0：
+- `distill` 50 项 —— 摘录裁剪（单条超预算截断、插件召回块过滤）、只看当前轮的触发判定、模型输出解析容错、显式提示词识别；v0.3.0：
   keywords/supersedes 解析、user 类别强制 global、提示词 v2 指引、existingRecords 带 id。
 - `distill-global` 34 项 —— 二级蒸馏的判定层：候选准入（项目载体 / 常识套话 / 长度）、
   按证据强度分层的晋升门槛（constraint / feedback / preference 单项目即可，decision / convention 要第二个项目）、
   主题词聚类与项目去重、模型输出解析容错（按类别分层的锚点底线、空数组 / 坏 JSON / 全被拒绝的诊断计数、
   对象包数组的容错），自适应节奏公式（空跑指数退避、素材闸 + 用户证据捷径），以及「候选池 → 晋升」端到端链路。
-- `api` 89 项 —— 54 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
+- `api` 90 项 —— 54 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
   /health 与 /health/resolve、/timeline、草稿队列（批准带编辑 / 拒绝 / 带 supersedes 的批准兑现版本链）、
   /save 带 supersedes 与 /supersede/rollback；v0.6：`GET /portrait/diff`（上一版 → 当前版的逐段 diff）；
   0.6.4：`GET /record` 依据下钻、`/redline/check` 冲突检查、`/redline/update` 改稿审计、
   `/redline/history` 与 `/redline/rollback`、Dream 时序矛盾归档与 `/health/resolve time-order`。
-- `host` 22 项 —— 导出形状、Config 默认值与越界校验（含二级蒸馏的素材门槛 / 基础间隔）、C7 文档覆盖闸。
-- `activate` 65 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
+- `host` 26 项 —— 导出形状、Config 默认值与越界校验（含二级蒸馏的素材门槛 / 基础间隔）、C7 文档覆盖闸。
+- `activate` 68 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
   工具 save/search/get/forget、全文简报装不下时明说「只列了 N / M 条」、`/memory/api/*` 路由真的应答
   且守好 403/404、手动提炼端到端、面板保存落到工作区镜像、既有记忆扫描导入、数据目录不可用不炸外壳；
   v0.3.0：索引简报（带 id 不展开正文 + full 模式对照）、轮末召回（召回块出现、连续两轮不重复）、
@@ -762,10 +780,11 @@ npm test          # 或 node test/run-all.mjs
   没有会话请求头时回落到宿主默认模型，连默认模型都没有时错误明细是可操作的一句话；
   二级蒸馏空产出 / 全被准入挡掉时，台账与 `/health` 能看到原因、拒绝计数与脱敏原文；
   重复表述不新增候选时按「没有进展」进入退避，不会每 15 分钟重跑同样的调用；
-  轮末自动链路（capture → distillDue → runGlobalDistill → 落候选池）也有端到端用例。
-- `briefing-stability` 17 项 —— 会话级冻结快照、确定性排序、轮末召回的尾部注入与去重；
+  轮末自动链路（capture → distillDue → runGlobalDistill → 落候选池）也有端到端用例；
+  会话索引不把尾部召回块写成本轮用户发言（避免自我召回与重复提炼）。
+- `briefing-stability` 18 项 —— 会话级冻结快照、确定性排序、轮末召回的尾部注入与去重、重算硬冷却（冷却期内攒够条数也不追加系统提示）；
   改检索算法时用它守住「系统提示字节稳定」。
-- `client` 75 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
+- `client` 78 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
   接到真实 `store` + `api` 上驱动交互（列表 / 搜索 / 新建 / 删除 / 置顶 / 中英文切换 / 后端报错）；
   档案视图的分区与两种排布、整篇编辑、整理、开关即时落库、时间线与维护 tab、五个页签
   （项目 / 全局 / 红线各自独立，红线不再混在全局页）、项目页切换工作区后只显示该工作区的条目并预览其 MEMORY.md；

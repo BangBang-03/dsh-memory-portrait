@@ -10,6 +10,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const mod = await import('../lib/store.js');
+const { POLICIES, validatePolicies } = await import('../lib/policy.js');
 const {
   createMemoryStore,
   workspaceKey,
@@ -1426,7 +1427,7 @@ test('consolidateCluster：置顶来源合并后新记录仍置顶', () => {
   assert.equal(s.get(b.id, { workspace: ws }).archived, true, '来源乙应归档');
 });
 
-test('近似但语义相反的条目不进重复簇，直接合并返回 contradiction_pair', () => {
+test('近似但语义相反的条目可被召回，但合并安全闸仍拒绝（判定退到动作前）', () => {
   const s = iso('contradiction-merge');
   const ws = makeWorkspace('v03-contradiction-merge');
   const a = s.upsert(
@@ -1438,7 +1439,7 @@ test('近似但语义相反的条目不进重复簇，直接合并返回 contrad
     { workspace: ws },
   ).record;
 
-  assert.equal(s.findDuplicateClusters({ workspace: ws }).length, 0, '矛盾对不应进入重复簇');
+  assert.equal(s.findDuplicateClusters({ workspace: ws }).length, 1, '召回阶段不下矛盾结论，簇应可见');
   const merged = s.consolidateCluster([a.id, b.id], { workspace: ws });
   assert.equal(merged.error, 'contradiction_pair', '直接合并矛盾对必须被拒绝');
   assert.equal(s.get(a.id, { workspace: ws }).archived, false, '矛盾甲不应归档');
@@ -1518,7 +1519,11 @@ test('时序矛盾：保留新结论、归档旧结论；红线/置顶/用户旧
 
   const oldSafe = add('部署前必须跑完整测试。', '部署前必须跑完整测试。', 'agent', '2026-01-01T00:00:00.000Z', ['deploy']);
   const newSafe = add('部署前不要跑完整测试。', '部署前不要跑完整测试。', 'manual', '2026-02-01T00:00:00.000Z', ['deploy']);
-  const safe = s.resolveContradictionsByTime({ workspace: ws });
+  /* 默认只报告：词法线索误报率高，省略 apply 时绝不归档。 */
+  const dry = s.resolveContradictionsByTime({ workspace: ws });
+  assert.equal(dry.resolved.length, 0, '默认不归档');
+  assert.ok(dry.pending.length >= 1, '默认仍产出待确认线索');
+  const safe = s.resolveContradictionsByTime({ workspace: ws, apply: true });
   assert.equal(safe.resolved.length, 1, '可安全判断的矛盾应按时序处理');
   assert.equal(safe.resolved[0].archivedId, oldSafe.id);
   assert.equal(safe.resolved[0].keptId, newSafe.id);
@@ -1528,7 +1533,7 @@ test('时序矛盾：保留新结论、归档旧结论；红线/置顶/用户旧
 
   const oldUser = add('数据库只读。', '数据库只读。', 'manual', '2026-01-01T00:00:00.000Z', ['db']);
   add('数据库不要只读。', '数据库不要只读。', 'agent', '2026-02-01T00:00:00.000Z', ['db']);
-  const userGuard = s.resolveContradictionsByTime({ workspace: ws });
+  const userGuard = s.resolveContradictionsByTime({ workspace: ws, apply: true });
   assert.ok(
     userGuard.pending.some(
       (pair) => pair.reason === 'user_older' && (pair.a === oldUser.id || pair.b === oldUser.id),
@@ -1547,7 +1552,7 @@ test('时序矛盾：保留新结论、归档旧结论；红线/置顶/用户旧
   );
   add('发布前不要打标签。', '发布前不要打标签。', 'manual', '2026-02-01T00:00:00.000Z', ['release']);
   assert.ok(
-    s.resolveContradictionsByTime({ workspace: ws }).pending.some((pair) => pair.reason === 'pinned_older'),
+    s.resolveContradictionsByTime({ workspace: ws, apply: true }).pending.some((pair) => pair.reason === 'pinned_older'),
     '旧条置顶时应保留待确认',
   );
   assert.equal(s.get(oldPinned.id, { workspace: ws }).archived, false);
@@ -1568,7 +1573,7 @@ test('时序矛盾：保留新结论、归档旧结论；红线/置顶/用户旧
     ['prod'],
   );
   assert.ok(
-    s.resolveContradictionsByTime({ workspace: ws }).pending.some(
+    s.resolveContradictionsByTime({ workspace: ws, apply: true }).pending.some(
       (pair) => pair.reason === 'redline_protected',
     ),
     '红线旧条应保留待确认',
@@ -1610,11 +1615,12 @@ test('health：重复簇 / 过期未用 / 断链 / 草稿数', () => {
   const linked = s.upsert({ title: '带链接的记忆', content: 'x', related: [dupA.record.id, 'mem_missing'] }, { workspace: ws });
   s.upsert({ title: '体检草稿', content: 'x', status: 'draft', source: 'auto' }, { workspace: ws });
 
-  // 造一条「过期未用」：直接改盘上的 updatedAt 再让 store 重读。
+  // 造一条「过期未用」：把 createdAt 改到 90 天前（判定看 lastUsedAt || createdAt，
+  // 不再看会被置顶 / 改类别 / 自动续期刷新的 updatedAt），再让 store 重读。
   const stale = s.upsert({ title: '过期未用的记忆', content: 'x' }, { workspace: ws });
   const dataFile = s.workspaceInfo(ws).dataFile;
   const raw = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
-  raw.records.find((r) => r.id === stale.record.id).updatedAt = new Date(Date.now() - 90 * 86400000).toISOString();
+  raw.records.find((r) => r.id === stale.record.id).createdAt = new Date(Date.now() - 90 * 86400000).toISOString();
   fs.writeFileSync(dataFile, JSON.stringify(raw, null, 2), 'utf8');
   s.invalidate(ws);
 
@@ -1668,6 +1674,126 @@ test('health：正常库零矛盾误报（同主题共存与孤立否定句都�
 
   const health = s.health({ workspace: ws });
   assert.deepEqual(health.contradictions, [], '正常库不应有疑似矛盾对');
+});
+
+test('health：变更语态不报矛盾，只有对方仍在坚持旧断言才算冲突', () => {
+  const s = iso('health-contradiction-change');
+  const ws = makeWorkspace('v03-contradiction-change');
+
+  /* 改造记录 + 同主题描述：这是真实库上最常见的误报形态，不该报。 */
+  s.upsert(
+    {
+      title: '记忆整理改为启动时自动触发',
+      content: '记忆整理不再需要手动点「整理一次」，条目层在启动时检查。',
+      tags: ['memory'],
+    },
+    { workspace: ws },
+  );
+  s.upsert(
+    {
+      title: '记忆整理流程',
+      content: '记忆整理在启动时跑一遍，合并重复簇并报告过期条目。',
+      tags: ['memory'],
+    },
+    { workspace: ws },
+  );
+  assert.deepEqual(s.health({ workspace: ws }).contradictions, [], '变更语态不是矛盾');
+
+  /* 同一句「不再」，但对方明确还在坚持旧做法——这才构成真冲突。 */
+  s.upsert(
+    {
+      title: '整理入口仍保留',
+      content: '整理仍然需要手动点一次，启动时不自动跑。',
+      tags: ['memory'],
+    },
+    { workspace: ws },
+  );
+  assert.equal(s.health({ workspace: ws }).contradictions.length, 1, '对方坚持旧断言时应报');
+});
+
+test('health：attention 只算真需要人的项；复审先自动续期，连两轮零引用才升级', () => {
+  const s = iso('health-attention');
+  const ws = makeWorkspace('v03-attention');
+  const past = new Date(Date.now() - 86400000).toISOString();
+
+  s.upsert(
+    { title: '隔离出来的草稿', content: '命中注入模式的内容。', status: 'draft' },
+    { workspace: ws },
+  );
+  const reviewed = s.upsert(
+    {
+      title: '带失效条件的结论',
+      content: '当前部署走单机模式。',
+      falsifier: '出现多节点需求时这条不再成立。',
+      reviewAt: past,
+    },
+    { workspace: ws },
+  ).record;
+
+  const first = s.health({ workspace: ws });
+  assert.equal(first.reviewDue.length, 1, '到期项仍在复审队列里');
+  assert.equal(first.reviewEscalated.length, 0, '刚到期不该立刻找人');
+  assert.deepEqual(first.attention, { drafts: 1, reviews: 0, total: 1 }, '只算草稿');
+
+  /* 自动续期：推后到期、计数 +1，但不写 reviewedAt（那代表「人看过」）。 */
+  const renewed = s.markReviewed(reviewed.id, { workspace: ws, auto: true });
+  assert.ok(renewed.ok);
+  assert.equal(renewed.record.autoReviewCount, 1);
+  assert.equal(renewed.record.reviewedAt, null, '自动续期不算人复审');
+
+  /* 再到期一次，计数到 2 且零引用 → 升级给人。 */
+  s.update(reviewed.id, { reviewAt: past }, { workspace: ws });
+  s.markReviewed(reviewed.id, { workspace: ws, auto: true });
+  s.update(reviewed.id, { reviewAt: past }, { workspace: ws });
+  const escalated = s.health({ workspace: ws });
+  assert.equal(escalated.reviewEscalated.length, 1, '连续两轮自动续期且零引用才升级');
+  assert.deepEqual(escalated.attention, { drafts: 1, reviews: 1, total: 2 });
+
+  /* 人真的点一次：reviewedAt 落时间，自动续期计数归零，退出升级队列。 */
+  s.markReviewed(reviewed.id, { workspace: ws });
+  const afterHuman = s.health({ workspace: ws });
+  assert.equal(afterHuman.reviewEscalated.length, 0, '人确认后不再升级');
+  assert.deepEqual(afterHuman.attention, { drafts: 1, reviews: 0, total: 1 });
+});
+
+test('误报回归夹具：默认零结论、显式诊断只读、误报不触发归档', () => {
+  const fixture = JSON.parse(
+    fs.readFileSync(new URL('./fixtures/false-positive-2026-11-09.json', import.meta.url), 'utf8'),
+  );
+  const s = iso('false-positive-corpus');
+  const ws = makeWorkspace('v03-false-positive-corpus');
+
+  const ids = [];
+  for (const pair of fixture.falsePositiveCorpus) {
+    ids.push(s.upsert(pair.a, { workspace: ws }).record.id);
+    ids.push(s.upsert(pair.b, { workspace: ws }).record.id);
+  }
+  ids.push(s.upsert(fixture.trueContradiction.a, { workspace: ws }).record.id);
+  ids.push(s.upsert(fixture.trueContradiction.b, { workspace: ws }).record.id);
+
+  const silent = s.health({ workspace: ws, includeContradictions: false });
+  assert.deepEqual(silent.contradictions, [], '默认路径必须零矛盾结论');
+  assert.equal(silent.contradictionsRequested, false);
+
+  const explicit = s.health({ workspace: ws, includeContradictions: true });
+  assert.equal(explicit.contradictionsRequested, true);
+  assert.ok(explicit.contradictions.length >= 1, '显式扫描仍要能召回冲突线索');
+
+  /* 误报无害：省略 apply 时只报告，语料里的记录一条都不许被归档。 */
+  const outcome = s.resolveContradictionsByTime({ workspace: ws });
+  assert.equal(outcome.resolved.length, 0, '默认绝不自动归档');
+  assert.ok(
+    ids.every((id) => s.get(id, { workspace: ws }).archived === false),
+    '误报语料里的记录必须仍是 active',
+  );
+
+  assert.ok(fixture.falsePositiveCorpus.length >= 10, '夹具要覆盖真实库那 10 对误报');
+  assert.deepEqual(validatePolicies(), [], '策略注册表契约成立');
+  assert.ok(
+    POLICIES.filter((rule) => rule.detector === 'lexical').every((rule) =>
+      ['signal', 'quarantine'].includes(rule.defaultAction)),
+    '词法规则只能出信号 / 隔离',
+  );
 });
 
 test('health：大标签库不卡秒级，且大标签跳过不伤矛盾召回', () => {
@@ -2452,9 +2578,104 @@ test('sessionLogAppend：会话索引写入前脱敏，npm token 不落盘', () 
   assert.equal(found.some((entry) => String(entry.text).includes(token)), false, '检索也不应返回原文');
 });
 
+/* ---------------- 时间轴 / 语义裁决回归 ---------------- */
+
+test('时间轴：contentUpdatedAt 只在标题/正文改写时刷新', () => {
+  const seeded = {
+    ...mod.normalizeRecord({ title: '旧结论', content: '用 webpack 构建' }, null),
+    contentUpdatedAt: '2020-01-01T00:00:00.000Z',
+  };
+  const metaOnly = mod.normalizeRecord({ pinned: true }, seeded);
+  assert.equal(metaOnly.contentUpdatedAt, '2020-01-01T00:00:00.000Z', '置顶不该刷新内容时间');
+  const rewritten = mod.normalizeRecord({ content: '改用 vite 构建' }, seeded);
+  assert.notEqual(rewritten.contentUpdatedAt, '2020-01-01T00:00:00.000Z', '改正文才刷新');
+  assert.ok(rewritten.systemTouchedAt, '系统元数据改写仍有审计时间');
+});
+
+test('时间轴：新记录带有效窗口，supersede 关闭旧事实窗口且保留记录', () => {
+  const s = iso('timeline-supersede');
+  const ws = makeWorkspace('v03-timeline-supersede');
+  const old = s.upsert({ title: '用 webpack 构建', content: '项目用 webpack 打包。' }, { workspace: ws }).record;
+  assert.equal(old.validFrom, old.createdAt);
+  assert.equal(old.validUntil, null);
+  assert.equal(old.invalidatedBy, null);
+
+  const sup = s.supersede(old.id, { title: '改用 vite 构建', content: '项目改用 vite 打包。' }, { workspace: ws });
+  assert.ok(sup.ok);
+  const retired = s.get(old.id, { workspace: ws });
+  assert.equal(retired.validUntil, sup.record.createdAt, '旧事实窗口在新条创建时关闭');
+  assert.equal(retired.invalidatedBy, sup.record.id);
+  assert.equal(retired.archived, true, 'D7：归档而非删除，仍可回滚');
+  assert.equal(retired.supersededBy, sup.record.id);
+});
+
+test('时间轴：旧库读盘补默认窗口，autoReviewCount 不丢', () => {
+  const s = iso('timeline-legacy');
+  const ws = makeWorkspace('v03-timeline-legacy');
+  const r = s.upsert({ title: '旧记录', content: '没有时间轴字段的旧库记录。' }, { workspace: ws }).record;
+  const dataFile = s.workspaceInfo(ws).dataFile;
+  const raw = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+  const row = raw.records.find((item) => item.id === r.id);
+  delete row.validFrom;
+  delete row.validUntil;
+  delete row.invalidatedBy;
+  delete row.contentUpdatedAt;
+  delete row.systemTouchedAt;
+  row.autoReviewCount = 2;
+  fs.writeFileSync(dataFile, JSON.stringify(raw, null, 2), 'utf8');
+  s.invalidate(ws);
+
+  const loaded = s.get(r.id, { workspace: ws });
+  assert.equal(loaded.validFrom, loaded.createdAt, '旧库按 createdAt 补窗口');
+  assert.equal(loaded.validUntil, null);
+  assert.equal(loaded.invalidatedBy, null);
+  assert.ok(loaded.contentUpdatedAt, '旧库按 updatedAt 补内容时间');
+  assert.equal(loaded.autoReviewCount, 2, '自动续期计数重启后不能丢');
+});
+
+test('排序：已失效事实静态降权，stable 排序不读当前时间', () => {
+  const base = {
+    title: '同一条事实', content: '内容一样', category: 'fact',
+    createdAt: '2026-01-01T00:00:00.000Z', status: 'active', archived: false,
+  };
+  const live = { ...base, id: 'a' };
+  const retired = { ...base, id: 'b', validUntil: '2026-02-01T00:00:00.000Z' };
+  const first = rankRecords([live, retired], { limit: 10, stable: true });
+  assert.equal(first[0].record.id, 'a', '仍有效的事实优先');
+  assert.ok(first[0].score > first[1].score);
+  assert.equal(first[1].score, first[0].score * 0.3, '失效事实静态降到 0.3×');
+  const second = rankRecords([retired, live], { limit: 10, stable: true });
+  assert.deepEqual(
+    second.map((r) => [r.record.id, r.score]),
+    first.map((r) => [r.record.id, r.score]),
+    '换落库顺序结果一致，且不依赖当前时间',
+  );
+  const searched = rankRecords([live, retired], { query: '同一条事实', limit: 10 });
+  assert.equal(searched[0].record.id, 'a', '检索路径同样降权');
+});
+
+test('快照：携带 validity，不带本机统计与系统时间戳（D8）', () => {
+  const rows = [{
+    id: 'mem_a', title: 'A', content: '甲', status: 'active', scope: 'workspace',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    validFrom: '2026-01-01T00:00:00.000Z',
+    validUntil: '2026-02-01T00:00:00.000Z',
+    invalidatedBy: 'mem_b',
+    useCount: 9, exposedCount: 12, lastUsedAt: '2026-03-01T00:00:00.000Z',
+    contentUpdatedAt: '2026-03-01T00:00:00.000Z', systemTouchedAt: '2026-03-01T00:00:00.000Z',
+  }];
+  const snap = portableSnapshot(rows, { root: '/ws', generatedAt: 'FIXED' });
+  assert.equal(snap.records[0].validUntil, '2026-02-01T00:00:00.000Z');
+  assert.equal(snap.records[0].invalidatedBy, 'mem_b');
+  for (const key of ['useCount', 'exposedCount', 'lastUsedAt', 'contentUpdatedAt', 'systemTouchedAt']) {
+    assert.equal(snap.records[0][key], undefined, `快照不该带 ${key}`);
+  }
+});
+
 /* ---------------- 结果 ---------------- */
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
+
 try {
   fs.rmSync(tmp, { recursive: true, force: true });
 } catch {

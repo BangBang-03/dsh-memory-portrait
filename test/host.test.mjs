@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { checkLocal } from '../tools/check-compat.mjs';
 import { verifyDocNumbers } from '../tools/doc-numbers.mjs';
+import { POLICIES, validatePolicies, autoHandledRules } from '../lib/policy.js';
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -47,7 +48,7 @@ check('Config 解析空对象得到默认值', () => {
   assert.equal(value.briefingLimit, 12);
   assert.equal(value.briefingMaxChars, 2000);
   assert.equal(value.briefingRebuildMinNew, 3, '简报重算闸默认攒 3 条新记录');
-  assert.equal(value.briefingRebuildCooldownMs, 600000, '简报重算闸默认 10 分钟');
+  assert.equal(value.briefingRebuildCooldownMs, 1800000, '简报重算闸默认 30 分钟');
   assert.equal(value.portraitMaxChars, 1400);
   assert.equal(value.discipline, true);
   assert.equal(value.rewriteMode, 'direct');
@@ -245,6 +246,46 @@ check('权限声明覆盖 git 且无外发网络', () => {
   assert.equal(manifest.dsh?.permissions?.commands, 'git');
   assert.equal(manifest.dsh?.permissions?.credentials?.length, 0);
   assert.equal(manifest.dsh?.permissions?.externalServices?.length, 0);
+});
+
+check('策略注册表：现有规则全部通过治理校验，且自动项占多数', () => {
+  assert.deepEqual(validatePolicies(), []);
+  assert.ok(
+    autoHandledRules().length > POLICIES.filter((rule) => rule.requiresHuman).length,
+    '人工只能兜底，不能是主路径',
+  );
+  const lexical = POLICIES.filter((rule) => rule.detector === 'lexical');
+  assert.ok(lexical.length >= 2, '词法规则应登记在册');
+  assert.ok(lexical.every((rule) => ['signal', 'quarantine'].includes(rule.defaultAction)), '词法项只能出信号 / 隔离');
+});
+
+check('策略注册表：不可逆却不要人，校验必须报违规', () => {
+  const bad = [{
+    id: 'bad-irreversible', detector: 'deterministic', reversible: false,
+    requiresHuman: false, defaultAction: 'delete', surfaces: [],
+  }];
+  assert.ok(validatePolicies(bad).some((v) => v.includes('不可逆动作必须 requiresHuman')));
+});
+
+check('策略注册表：词法判定默认归档，校验必须报违规', () => {
+  const bad = [{
+    id: 'bad-lexical-archive', detector: 'lexical', reversible: true,
+    requiresHuman: false, defaultAction: 'archive', surfaces: [],
+  }];
+  assert.ok(validatePolicies(bad).some((v) => v.includes('词法判定不得默认执行')));
+});
+
+check('策略注册表：人工项与 attention 不对应，校验必须报违规', () => {
+  const missing = [{
+    id: 'bad-hidden-human', detector: 'deterministic', reversible: true,
+    requiresHuman: true, defaultAction: 'signal', surfaces: ['maintain'],
+  }];
+  const noisy = [{
+    id: 'bad-auto-alert', detector: 'deterministic', reversible: true,
+    requiresHuman: false, defaultAction: 'signal', surfaces: ['attention'],
+  }];
+  assert.ok(validatePolicies(missing).some((v) => v.includes('需要人确认却不在 attention')));
+  assert.ok(validatePolicies(noisy).some((v) => v.includes('自动项不该占用 attention')));
 });
 
 let failed = 0;
