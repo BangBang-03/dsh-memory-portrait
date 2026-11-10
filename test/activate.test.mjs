@@ -360,6 +360,39 @@ await test('模型工具 save / search / list / stats 走真实 store 并落盘'
   assert.ok(fs.existsSync(path.join(dir, 'index.json')) || fs.existsSync(dir));
 });
 
+await test('模型工具 list archived=true 能看到归档条目（参数映射到 includeArchived）', async () => {
+  const { tool, exec } = activate();
+  const saved = await tool.execute(
+    { action: 'save', title: '归档后仍可见', content: '这条会被归档，用来验证 list 的 archived 参数。' },
+    exec,
+  );
+  const id = /`(mem_[A-Za-z0-9_]+)`/.exec(saved.text)?.[1];
+  assert.ok(id);
+  assert.equal((await tool.execute({ action: 'update', id, archived: true }, exec)).count, 1);
+
+  const plain = await tool.execute({ action: 'list', limit: 20 }, exec);
+  assert.equal(plain.text.includes('归档后仍可见'), false, '默认列表不含归档');
+  const withArchived = await tool.execute({ action: 'list', archived: true, limit: 20 }, exec);
+  assert.equal(withArchived.text.includes('归档后仍可见'), true, 'archived=true 必须真的带上归档条目');
+});
+
+await test('POST /settings：越界值被 Config 上下界挡下，合法键照常生效', async () => {
+  const { route } = activate();
+  const before = await callRoute(route, { url: '/memory/api/state' });
+  assert.equal(before.body.settings.briefingLimit, 12);
+
+  const res = await callRoute(route, {
+    method: 'POST',
+    url: '/memory/api/settings',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ settings: { briefingLimit: 9999, hudOpacity: 42, briefing: false } }),
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.settings.briefingLimit, 12, '越界条数应被丢弃，保留上一版值');
+  assert.equal(res.body.settings.hudOpacity, 1, '越界不透明度应被丢弃');
+  assert.equal(res.body.settings.briefing, false, '同一批里的合法键不该被连坐');
+});
+
 await test('没有工作区目录时工具给的是可读提示，而不是抛错', async () => {
   const { tool } = activate();
   const result = await tool.execute({ action: 'stats' }, { agent: { session: { header: {} } } });
@@ -581,6 +614,17 @@ await test('Config 的默认值落到运行时设置里，且能被 settings.jso
   assert.equal(stored.briefingMaxChars, 900);
   assert.equal(stored.briefingLimit, 3);
   assert.equal(stored.mirror, false);
+
+  /* 手写 settings.json / 自动化客户端常把布尔写成字符串：\"false\" 必须解析成 false。 */
+  const off = await callRoute(route, {
+    method: 'POST',
+    url: '/memory/api/settings',
+    headers: { host: '127.0.0.1:19387' },
+    body: JSON.stringify({ settings: { mirror: 'false', briefing: 'off' } }),
+  });
+  assert.equal(off.status, 200);
+  assert.equal(off.body.settings.mirror, false, '字符串 "false" 不能按真值处理');
+  assert.equal(off.body.settings.briefing, false, '字符串 "off" 不能按真值处理');
 });
 
 await test('接了 llm 服务：粘贴文本提炼出候选，且不落库', async () => {
@@ -1581,6 +1625,34 @@ await test('工具 save 带 supersedes：旧条归档，get 展示版本链', as
 
   const listed = await tool.execute({ action: 'list' }, exec);
   assert.equal(listed.count, 1, '旧条归档后 list 只剩新条');
+});
+
+await test('工具 save 带 id 更新：没给的字段保持原值（tags / category / evidence）', async () => {
+  const { tool, exec } = activate();
+  const created = await tool.execute(
+    {
+      action: 'save',
+      title: '保留字段原文',
+      content: '更新时未给出的字段不能被清空。',
+      category: 'convention',
+      tags: ['alpha', 'beta'],
+      evidence: { quote: '原始出处' },
+    },
+    exec,
+  );
+  const id = /`(mem_[A-Za-z0-9_]+)`/.exec(created.text)?.[1];
+  assert.ok(id, '新建应返回 id');
+
+  const updated = await tool.execute(
+    { action: 'save', id, title: '保留字段原文（改）', content: '更新时未给出的字段不能被清空。' },
+    exec,
+  );
+  assert.match(updated.text, /已保存记忆/);
+
+  const listed = await tool.execute({ action: 'list' }, exec);
+  assert.match(listed.text, /\[约定\]/, 'category 不该被重置成 decision');
+  assert.match(listed.text, /alpha #beta|alpha, beta/, 'tags 不该被空数组清掉');
+  assert.match(listed.text, /出处：原始出处/, 'evidence 不该被 null 清掉');
 });
 
 /* ------------------------------------------------------------------ *

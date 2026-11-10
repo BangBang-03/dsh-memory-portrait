@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   从某个 DSH profile 里卸掉 dsh-memory（install.ps1 的逆操作）。
@@ -52,8 +52,10 @@ function Get-BackupPath([string]$Path) {
 }
 
 function Remove-JunctionSafe([string]$Path) {
-  if (-not (Test-Path -LiteralPath $Path)) { Write-Step "本来就不存在：$Path"; return }
-  $item = Get-Item -LiteralPath $Path -Force
+  <# 先看 reparse point 本身：Test-Path 会跟随目标，目标被删后（DSH 升级常见）返回 false，
+     悬空 junction 就永远清不掉，下次安装还会撞上它。 #>
+  $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+  if (-not $item) { Write-Step "本来就不存在：$Path"; return }
   if ($item.LinkType -ne 'Junction') {
     throw "拒绝删除非 junction 路径（可能是真实目录，删了会丢东西）：$Path"
   }

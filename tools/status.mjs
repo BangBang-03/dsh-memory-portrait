@@ -30,6 +30,10 @@ async function api(apiPath) {
 }
 
 const info = await api(`/repos/${repo}`);
+if (!info) {
+  console.error("读不到仓库信息（token 失效 / 限流 / 网络不通）");
+  process.exit(1);
+}
 console.log("repo       " + repo + "   (默认分支 " + info.default_branch + ")");
 
 const branches = (await api(`/repos/${repo}/branches?per_page=100`)) ?? [];
@@ -39,7 +43,7 @@ for (const branch of branches) {
 }
 
 const releases = (await api(`/repos/${repo}/releases?per_page=20`)) ?? [];
-const stable = releases.find((release) => release.prerelease === false);
+const stable = releases.find((release) => release.prerelease === false && release.draft !== true);
 if (!stable) {
 	console.log("stable     (还没有正式版)");
 } else {

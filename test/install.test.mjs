@@ -81,13 +81,44 @@ function decodeConsole(buffer) {
   }
 }
 
+/**
+ * 优先 PowerShell 7（pwsh）；stock Windows 只有 5.1 时回退 powershell.exe。
+ *
+ * 装了两代的机器上，默认只会跑到 pwsh 7，5.1 就永远没被这套用例覆盖过
+ * （脚本里的语法 / cmdlet 差异要等用户装不上才发现）。
+ * 显式指定 DSH_MEMORY_TEST_PS=powershell 可以强制跑 5.1 做一次兼容性验证。
+ */
+const PS_BIN = (() => {
+  const forced = String(process.env.DSH_MEMORY_TEST_PS || '').trim();
+  if (forced) return forced;
+  /* 布尔开关，方便在装了两代的 Windows 上明确跑一遍 5.1（不必拼解释器路径）。 */
+  if (process.env.DSH_MEMORY_TEST_PS51) return 'powershell';
+  const probe = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0'], {
+    encoding: 'utf8',
+  });
+  return probe.status === 0 ? 'pwsh' : 'powershell';
+})();
+
+/**
+ * 统一的 PowerShell 命令行。同步 / 异步两个入口必须共用：
+ * 早先 runScriptAsync 自己拼了一份 argv，5.1 的 -ExecutionPolicy Bypass 只加到同步版，
+ * 于是 6 个 -FromNpm / -FromUrl 用例在 5.1 上全被 ExecutionPolicy 拦在脚本外面。
+ */
+function psCommand(script, args) {
+  const psArgs = ['-NoProfile', '-NonInteractive'];
+  /*
+   * Windows PowerShell 5.1 的 ExecutionPolicy 常是 Restricted / RemoteSigned，
+   * `-File` 会在脚本执行前就被 AuthorizationManager 拦掉（报 UnauthorizedAccess），
+   * 跟脚本内容无关。测试跑的是自己造的临时脚本，显式 Bypass 才能真的验到 5.1 的语法与 cmdlet。
+   */
+  if (PS_BIN !== 'pwsh') psArgs.push('-ExecutionPolicy', 'Bypass');
+  psArgs.push('-File', path.join(pkgRoot, script), ...args);
+  return psArgs;
+}
+
 /** 跑脚本；返回 { status, stdout, stderr }。 */
 function runScript(script, args) {
-  const result = spawnSync(
-    'pwsh',
-    ['-NoProfile', '-NonInteractive', '-File', path.join(pkgRoot, script), ...args],
-    { encoding: 'buffer' },
-  );
+  const result = spawnSync(PS_BIN, psCommand(script, args), { encoding: 'buffer' });
   if (result.error) throw result.error;
   return {
     status: result.status,
@@ -124,6 +155,18 @@ const storageDir = path.join(fakeHome, 'storages', 'dsh-memory');
  * ------------------------------------------------------------------ */
 
 console.log('dsh-memory install / uninstall');
+
+await test('install.ps1 的 param() 默认值不依赖 $PSScriptRoot（PowerShell 5.1 里它为空串）', () => {
+  /*
+   * 5.1 在求参数默认值时还没给 $PSScriptRoot 赋值：远程模式不传 -PackageRoot，
+   * 于是第一句 Resolve-Path -LiteralPath '' 就抛参数绑定错误，安装直接失败。
+   * 默认值改在脚本正文里兜底；这条静态断言保证以后不会被「顺手挪回参数表」。
+   */
+  const script = fs.readFileSync(path.join(pkgRoot, 'install.ps1'), 'utf8');
+  const block = /param\(([\s\S]*?)\n\)/.exec(script)?.[1] || '';
+  assert.equal(/\$PSScriptRoot/.test(block), false, '参数默认值里不能引用 $PSScriptRoot');
+  assert.match(script, /if \(-not \$PackageRoot\) \{ \$PackageRoot = \$PSScriptRoot \}/);
+});
 
 await test('install.ps1 把包挂进 bundles、dependencies 与 junction，并先备份', () => {
   seed();
@@ -344,7 +387,7 @@ const remoteProfileLink = path.join(remoteProfileDir, 'node_modules', '@bangbang
  */
 function runScriptAsync(script, args) {
   return new Promise((resolve) => {
-    const child = spawn('pwsh', ['-NoProfile', '-NonInteractive', '-File', path.join(pkgRoot, script), ...args], {
+    const child = spawn(PS_BIN, psCommand(script, args), {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const chunks = { stdout: [], stderr: [] };

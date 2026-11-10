@@ -157,6 +157,23 @@ await test('POST /save scope=global 落全局', async () => {
   assert.equal(res.body.record.scope, 'global');
 });
 
+await test('POST /save 带 id 更新且不传 scope：全局记录不被搬进工作区', async () => {
+  const created = await call('POST', '/save', {
+    body: { title: '全局更新不漂移', content: '这条属于全局库。', category: 'preference', scope: 'global' },
+  });
+  const updated = await call('POST', '/save', {
+    body: { id: created.body.record.id, title: '全局更新不漂移（改）', content: '这条属于全局库。' },
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.record.scope, 'global', '缺省 scope 应沿用既有记录的 global');
+  assert.ok(
+    (await call('GET', '/list', { query: { scope: 'global' } })).body.records.some(
+      (r) => r.id === created.body.record.id,
+    ),
+    '更新后仍应出现在全局列表里',
+  );
+});
+
 /* ---------------- list ---------------- */
 
 await test('GET /list 返回当前工作区 + 全局记忆', async () => {
@@ -282,6 +299,16 @@ await test('POST /settings 更新并回读', async () => {
 await test('POST /settings 未知键被忽略', async () => {
   const res = await call('POST', '/settings', { body: { settings: { hacker: true } } });
   assert.equal(res.body.settings.hacker, undefined);
+});
+
+await test('POST /settings：未登记工作区 400 且设置不被改动（先校验后落盘）', async () => {
+  settingsValue.briefingLimit = 12;
+  const res = await call('POST', '/settings', {
+    body: { workspace: '/proj/not-registered', settings: { briefingLimit: 5 } },
+  });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error, 'invalid_workspace');
+  assert.equal(settingsValue.briefingLimit, 12, '被拒的请求不该已经改掉设置');
 });
 
 /* ---------------- export / import ---------------- */
@@ -654,6 +681,76 @@ await test('草稿队列：/queue 可见 → /queue/approve 生效（带编辑�
 
   const missing = await call('POST', '/queue/approve', { body: { id: 'mem_nope' } });
   assert.equal(missing.status, 404);
+});
+
+await test('GET /queue 先筛草稿再分页：超过 100 条 active 也看得见靠后的草稿', async () => {
+  /* 草稿更新时间刻意早于填充记录：旧实现先取 top100 再过滤，草稿会被挤出窗口。 */
+  store.import(
+    {
+      records: [
+        {
+          title: '队列靠后的草稿',
+          content: '这条草稿比填充记录旧。',
+          status: 'draft',
+          updatedAt: '2000-01-01T00:00:00.000Z',
+        },
+      ],
+    },
+    { workspace: WS },
+  );
+  const fillers = Array.from({ length: 105 }, (_, i) => ({
+    title: `队列填充 ${i}`,
+    content: `填充正文 ${i}。`,
+    category: 'note',
+  }));
+  store.import({ records: fillers }, { workspace: WS, mode: 'merge' });
+  const queue = await call('GET', '/queue');
+  assert.equal(queue.status, 200);
+  const draft = queue.body.records.find((r) => r.title === '队列靠后的草稿');
+  assert.ok(draft, '靠后的草稿也应在队列里');
+  assert.ok(queue.body.total >= 1);
+  const cleanup = store
+    .list({ workspace: WS, limit: 1000 })
+    .records.filter((r) => r.title.startsWith('队列填充 ') || r.title === '队列靠后的草稿')
+    .map((r) => r.id);
+  store.bulk('delete', cleanup, { workspace: WS });
+});
+
+await test('草稿 supersedes 红线：批准被拒且草稿保留（不静默删内容）', async () => {
+  const red = await call('POST', '/save', {
+    body: { title: '绝不提交密钥（草稿闸）', content: '任何情况下都不要把密钥提交进仓库。', category: 'constraint' },
+  });
+  const draft = store.upsert(
+    {
+      title: '推翻红线的草稿',
+      content: '其实可以提交密钥。',
+      category: 'decision',
+      status: 'draft',
+      source: 'auto',
+      supersedes: red.body.record.id,
+    },
+    { workspace: WS },
+  );
+  const res = await call('POST', '/queue/approve', { body: { id: draft.record.id } });
+  assert.equal(res.status, 403);
+  assert.equal(res.body.error, 'redline_protected');
+  assert.ok(store.get(draft.record.id, { workspace: WS, includeDrafts: true }), '审批失败不能把草稿删掉');
+  assert.equal(store.get(red.body.record.id, { workspace: WS }).archived, false, '红线不能被归档');
+});
+
+await test('草稿「拒绝并归档」：状态落定，不留在待审队列', async () => {
+  const draft = store.upsert(
+    { title: '留底草稿', content: '拒绝但保留的草稿', status: 'draft', source: 'auto' },
+    { workspace: WS },
+  );
+  const res = await call('POST', '/queue/reject', { body: { id: draft.record.id, mode: 'archive' } });
+  assert.equal(res.status, 200);
+  const after = store.get(draft.record.id, { workspace: WS, includeDrafts: true });
+  assert.equal(after.archived, true);
+  /* 只传 archived 会被状态机按 draft 保留：面板取消归档时它又冒回待审队列。 */
+  assert.equal(after.status, 'active', '归档留底的记录不该继续挂在草稿状态');
+  const queue = await call('GET', '/queue');
+  assert.equal(queue.body.records.some((r) => r.id === draft.record.id), false);
 });
 
 await test('GET /briefing-preview：与简报同一套打分，ids 供卡片标注', async () => {
@@ -1517,6 +1614,26 @@ await test('POST /portrait/migrate：跨 App 画像粘贴整合（rewrite 通道
   assert.ok(
     (merged?.sections || []).some((s) => String(s.text || '').includes('迁移背景')),
     '降级合并应把迁移段并入全局画像',
+  );
+
+  /* 空库（rewrite 通道回 no_material）也要降级合并：迁移文本本身就是原料，不能报 500 丢内容。 */
+  const apiNm = createApi({
+    store,
+    settings,
+    activeWorkspace: () => WS,
+    listWorkspaces: () => KNOWN_WORKSPACES.map((root) => ({ key: workspaceKey(root), root, active: root === WS })),
+    rewriteNow: async () => ({ ok: false, error: 'no_material', detail: '没有可重写的原料' }),
+  });
+  const nm = await apiNm.handle({
+    method: 'POST',
+    pathname: `${API_PREFIX}/portrait/migrate`,
+    body: { text: '{"background":"空库迁移背景。"}' },
+  });
+  assert.equal(nm.status, 200, 'no_material 不应被当成 500');
+  assert.equal(nm.body.via, 'fallback');
+  assert.ok(
+    (store.portrait('')?.sections || []).some((s) => String(s.text || '').includes('空库迁移背景')),
+    'no_material 时也要落库',
   );
 
   /* 坏载荷：非 JSON / 空文本一律 400。 */

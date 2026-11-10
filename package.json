@@ -47,6 +47,8 @@
     "./client": {
       "default": "./lib/client.js"
     },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./icon.svg": "./icon.svg",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
   },

@@ -1566,6 +1566,40 @@ await test('档案页的两个开关即时写入设置（走 /settings）', asyn
   assert.deepEqual(switchNodes().map((node) => node.props['data-on']), ['1', '0']);
 });
 
+await test('设置页：即时开关不清掉其它未保存改动', async () => {
+  renderPage('zh');
+  await settle();
+  await clickTab('tabSettings');
+  await settle(10);
+
+  const saveButton = () =>
+    mini.findAll(
+      view,
+      (node) =>
+        node.type === 'button' &&
+        String(node.props.className || '').includes('dshmem_btn_primary') &&
+        mini.textOf(node).trim() === '保存',
+    )[0];
+  assert.ok(saveButton(), '设置页应有保存按钮');
+  assert.equal(saveButton().props.disabled, true, '没有改动时保存按钮应禁用');
+
+  const numberInput = mini.findAllByTag(view, 'input').find((node) => node.props.type === 'number');
+  assert.ok(numberInput, '设置页应有数字输入');
+  mini.type(numberInput, '9');
+  await settle(4);
+  assert.equal(saveButton().props.disabled, false, '改数值后保存按钮应可用');
+
+  /* 回到记忆页点一个即时开关（只 patch 这一个键），未保存的数值改动必须还留在设置页。 */
+  await clickTab('tabProject');
+  await settle(8);
+  mini.click(switchNodes()[0]);
+  await settle(10);
+
+  await clickTab('tabSettings');
+  await settle(8);
+  assert.equal(saveButton().props.disabled, false, '即时开关不能清掉其它未保存的改动');
+});
+
 /* ---------------- 英文 ---------------- */
 
 await test('英文界面不带中文残留（导航/按钮走 en 字典）', async () => {

@@ -10,9 +10,9 @@
  *
  * 退出码：0 = 全部一致；1 = 有漂移或 npm 上查不到该版本。
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -169,6 +169,25 @@ async function main() {
   );
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+/**
+ * 判断本模块是否被当作入口直接执行。
+ * 不能用 `pathToFileURL(argv[1]) === import.meta.url`：工作区是 junction / symlink 时
+ * Node 会把 import.meta.url 解析成真实路径，而 argv[1] 仍是链接路径，两者永不相等——
+ * 脚本会「静默成功但什么都不检查」。两边都取 realpath 再比。
+ */
+function isEntryModule() {
+  if (!process.argv[1]) return false;
+  try {
+    const entry = realpathSync(path.resolve(process.argv[1]));
+    const self = realpathSync(fileURLToPath(import.meta.url));
+    return process.platform === 'win32'
+      ? entry.toLowerCase() === self.toLowerCase()
+      : entry === self;
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryModule()) {
   await main();
 }

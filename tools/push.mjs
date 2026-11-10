@@ -142,6 +142,23 @@ async function collect() {
 const { chain, base } = await collect();
 if (base) console.log("base     " + base.slice(0, 9) + " " + git("log", "-1", "--format=%s", base));
 if (chain.length === 0) {
+	/*
+	 * 新分支但提交已经在远端（例如从 main 切出来、还没提交就要先建远端的同名分支）：
+	 * collect 看到 remoteHas(localHead) 就停下，chain 为空——这不等于「已同步」，
+	 * 分支引用还不存在。补建 ref，否则 push 报告 synced 却什么都没做。
+	 */
+	if (!remoteHead && (await remoteHas(localHead))) {
+		console.log("synced   no");
+		console.log("待建分支  " + branch + " -> " + localHead.slice(0, 9));
+		if (DRY) {
+			console.log("dry run —— 没有改动远端");
+			process.exit(0);
+		}
+		await api("POST", `/repos/${repo}/git/refs`, { ref: "refs/heads/" + branch, sha: localHead });
+		const created = await api("GET", `/repos/${repo}/git/ref/heads/${branch}`);
+		console.log("verify   ref " + (created?.object?.sha === localHead ? "ok" : "MISMATCH") + " / " + String(created?.object?.sha || "").slice(0, 9));
+		process.exit(0);
+	}
 	console.log("synced   yes");
 	console.log("已经同步，没有要推的提交");
 	process.exit(0);

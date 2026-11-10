@@ -1,7 +1,7 @@
 # test
 
 全部测试都是脱离 DSH 的独立 `.mjs`，自带断言与计数，失败即 `exit 1`。
-当前 **15 个套件 / 704 条断言**。
+当前 **15 个套件 / 724 条断言**。
 
 ```powershell
 node test/run-all.mjs        # 15 个套件全跑（改完代码必跑）
@@ -24,12 +24,16 @@ node test/store.test.mjs     # 单跑一个：换成 retrieval / api / client �
 | `activate` | 假 cordis 跑 `apply()`：工具、提示段、路由真的能用；启动整理（合并 / 台账 / 快照）；自动刷新全局画像（吸收当前工作区近况 + 6h 节流） |
 | `briefing-stability` | 会话级冻结快照、确定性排序、轮末召回尾部注入 |
 | `client` | 客户端模块格式、槽位注册、渲染与交互（端到端）：三页签、首页四块、红线编辑器与历史、画像逐段 / 依据下钻、全局待审稿、自动刷新状态、收件箱、原料抽屉、Dream 矛盾报告 |
-| `install` | 安装脚本备份、幂等、dry run、卸载还原与拒绝误删 |
+| `install` | 安装脚本备份、幂等、dry run、卸载还原与拒绝误删；`-FromNpm` / `-FromUrl` 远程解包；PowerShell 5.1 兼容 |
 
 ## 约定
 
 - 新增套件：在本目录建 `<name>.test.mjs`，并把 `[name, 描述]` 加进 `run-all.mjs` 的 `suites` 数组。
 - 断言条数变化时不用手工数：`run-all` 跑完会比对文档里的数字，不一致会红并列出是哪 7 个文件里的哪种写法。
+- `install` 套件默认用 PowerShell 7（`pwsh`），本机只有 5.1 时自动回退；装了两代的 Windows 上可用
+  `DSH_MEMORY_TEST_PS51=1 node test/install.test.mjs` 强制跑一遍 5.1（也可用 `DSH_MEMORY_TEST_PS` 直接指定解释器）。
+  5.1 的 ExecutionPolicy 会把 `-File` 拦在脚本之外，测试入口只对 5.1 显式加 `-ExecutionPolicy Bypass`；
+  脚本自身不允许在 `param()` 默认值里引用 `$PSScriptRoot`（5.1 在该阶段拿到空串）。
 - `mini-react.mjs` 是给 `client.test.mjs` 用的极小 React 替身（`createElement` + 5 个 hook），
   不是通用实现，只在 DSH 之外把设置页真的渲染出来。
 - `fixtures/` 放测试数据，见 [fixtures/README.md](fixtures/README.md)。

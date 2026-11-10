@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![npm](https://img.shields.io/npm/v/@bangbang-03/dsh-memory?color=4d6bfe&label=npm)](https://www.npmjs.com/package/@bangbang-03/dsh-memory)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-704%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-724%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 **DSH 的记忆画像：不是记住更多，而是让你看见它怎么理解你。**<br>
 **Long-term memory for DeepSeek Harness, with a portrait you can inspect.**
@@ -57,6 +57,8 @@ pwsh -File install.ps1 -FromRelease -Channel stable
 
 脚本会下载最新稳定版 tarball、解包到 `~/.dsh/plugins/dsh-memory`，再完成垫片 / profile 清单 / junction 三步；**更新就是重跑同一条命令**。`-Channel lab` 是兼容别名，等同 `stable`。
 
+> Windows 自带的是 PowerShell 5.1（`powershell.exe`），本脚本兼容 5.1。没装 PowerShell 7 时，把命令里的 `pwsh -File` 换成 `powershell -NoProfile -ExecutionPolicy Bypass -File` 即可。
+
 ### 源码
 
 ```powershell
@@ -86,6 +88,8 @@ pwsh -File install.ps1             # 真装
 Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0.2 版本线**整体声明，避免 DSH 每发一个 nightly 就在宿主启动时被跳过；逐版本测试结论仍记在 `dsh.compatibility.dshReleases`，未测试的版本标 `unknown`，不冒充 compatible。
 
 > DSH 0.2.1 起，宿主在启动 / 重新组合时按 `engines.dsh` 判定组合包：不匹配的 bundle 会被**静默跳过**（列进 `skippedBundles`），市场卡片显示“已安装，与当前 dsh 不兼容”，插件功能整体不生效。升级 DSH 后若看到这行字，先确认上表的范围覆盖当前版本。
+
+> 范围覆盖只保证「能加载」。较新的宿主能力是**软依赖**，缺失时静默降级、不会拖垮插件：`agentDefaultModel`（0.2.2+，刚启动还没有会话请求头时给画像 / 整理兜底模型路由）、`shell.overlay`（前台会话卡）、`session/disposed`（会话销毁时的画像刷新）。旧版宿主上点「重写画像」若报 `no_model_route`，先在对话里发一条消息，或升级 DSH。
 
 > 兼容口径不是手写三份：`node tools/check-compat.mjs` 会核对 `package.json` 与 README 表格；`--npm` 再核对 npmjs 上已发布的同一版本。CI 在发版时跑后者。
 
@@ -282,7 +286,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 ## 测试
 
 ```powershell
-npm test   # 15 个套件 / 704 项断言
+npm test   # 15 个套件 / 724 项断言
 ```
 
 - 检索：54 条记忆 × 60 条查询硬评测，Recall@5 1.000、MRR@10 0.930（自测口径，见 [评测说明](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/retrieval-eval-2026-10-20.md)）。

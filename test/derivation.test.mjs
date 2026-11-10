@@ -173,6 +173,26 @@ test('AGENTS.md：重复晋升幂等（派生条目不重复，文件不重复�
   assert.equal(hits.length, 1, '同一行只应出现一次');
 });
 
+test('AGENTS.md：托管块以 --> 收尾（文件无末尾换行）时不重复写正文', () => {
+  const ws = makeWorkspace();
+  /*
+   * 触发条件：托管块是文件最后一行，且结束标记后没有换行符（手工编辑 / 其它工具写出的
+   * 常见形态）。旧实现用 indexOf('\n', bodyStart) + 1 求块内起点，找不到换行时得到 0，
+   * 于是把「整个文件」当成块内正文，写回去就是文件内容重复一遍 + 块重复一遍。
+   */
+  const START = '<!-- dsh-memory:promoted 开始（由 dsh-memory 维护，请勿手工编辑本块） -->';
+  const END = '<!-- dsh-memory:promoted 结束 -->';
+  fs.writeFileSync(path.join(ws, 'AGENTS.md'), `# AGENTS\n\n${START}${END}`, 'utf8');
+
+  const rec = store.upsert({ title: '改动前先备份', content: '任何批量改写前先留快照', category: 'convention' }, { workspace: ws });
+  assert.equal(store.promoteToAgents(ws, { id: rec.record.id }).ok, true);
+
+  const text = fs.readFileSync(path.join(ws, 'AGENTS.md'), 'utf8');
+  assert.equal((text.match(/promoted 开始/g) || []).length, 1, '开始标记只应出现一次');
+  assert.equal((text.match(/^# AGENTS$/gm) || []).length, 1, '块外正文不该被复制');
+  assert.match(text, /改动前先备份/);
+});
+
 /* ---------------- 链：记忆 → 画像 → AGENTS.md ---------------- */
 
 test('链：画像段被改写 → 从它派生的 AGENTS.md 标脏', () => {

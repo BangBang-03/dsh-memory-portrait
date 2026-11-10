@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   把 dsh-memory 装进某个 DSH profile（默认 desktop）。
@@ -78,7 +78,7 @@
 param(
   [string]$Profile = 'desktop',
   [string]$DshHome = $(if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $HOME '.dsh' }),
-  [string]$PackageRoot = $PSScriptRoot,
+  [string]$PackageRoot = '',
   [string]$FromNpm = '',
   [string]$FromUrl = '',
   [switch]$FromRelease,
@@ -90,6 +90,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# PowerShell 5.1 在 param() 的默认表达式里还没给 $PSScriptRoot 赋值（拿到空串），
+# 只有脚本正文里才有。远程模式（-FromNpm / -FromUrl / -FromRelease）不会显式传
+# -PackageRoot，旧写法在 5.1 上会卡在第一句 Resolve-Path -LiteralPath ''
+# （ParameterBindingValidationErrorEmptyStringNotAllowed），连下载都还没开始就退出。
+if (-not $PackageRoot) { $PackageRoot = $PSScriptRoot }
 
 # 真包名：依赖键 / bundles 项 / cordis 行名 / 客户端模块 id 都得是它（见文件头说明）。
 $PackageName = '@bangbang-03/dsh-memory'
@@ -118,10 +124,12 @@ function New-JunctionSafe([string]$Path, [string]$Target, [switch]$Repoint) {
     Write-Step "建目录 $parent"
     if (-not $DryRun) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
   }
-  if (Test-Path -LiteralPath $Path) {
-    $item = Get-Item -LiteralPath $Path -Force
-    if ($item.LinkType -ne 'Junction') { throw "已存在且不是 junction，拒绝覆盖：$Path" }
-    $current = @($item.Target)[0]
+  <# Test-Path 会跟随 junction 目标：目标被删后（DSH 升级常见）它返回 false，
+     New-Item 再建就会报「已存在」。用 Get-Item -Force 看 reparse point 本身。 #>
+  $existing = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+  if ($existing) {
+    if ($existing.LinkType -ne 'Junction') { throw "已存在且不是 junction，拒绝覆盖：$Path" }
+    $current = @($existing.Target)[0]
     if ($current -eq $Target) { Write-Step "junction 已就位：$Path"; return $false }
     if (-not $Repoint) { throw "junction 指向别处：$Path -> $current（期望 $Target）" }
     # 只给「包内垫片」用：DSH 升级后官方包位置会变，垫片跟着重指是正常维护动作。
@@ -158,7 +166,7 @@ function Save-Tarball([string]$Url, [string]$OutFile, [hashtable]$Headers, [stri
   while ($attempt -lt 2) {
     $attempt += 1
     try {
-      Invoke-WebRequest -Uri $Url -Headers $Headers -OutFile $OutFile -TimeoutSec 90 -ErrorAction Stop
+      Invoke-WebRequest -Uri $Url -Headers $Headers -OutFile $OutFile -TimeoutSec 90 -UseBasicParsing -ErrorAction Stop
       return
     } catch {
       Write-Step "直连下载失败（第 $attempt 次）：$($_.Exception.Message)"
@@ -179,7 +187,7 @@ function Save-Tarball([string]$Url, [string]$OutFile, [hashtable]$Headers, [stri
   }
   $apiHeaders['Accept'] = 'application/octet-stream'
   Write-Step "下载资产 $AssetName（$([math]::Round($asset.size / 1024)) KB）"
-  Invoke-WebRequest -Uri "$apiBase/assets/$($asset.id)" -Headers $apiHeaders -OutFile $OutFile -TimeoutSec 180 -ErrorAction Stop
+  Invoke-WebRequest -Uri "$apiBase/assets/$($asset.id)" -Headers $apiHeaders -OutFile $OutFile -TimeoutSec 180 -UseBasicParsing -ErrorAction Stop
 }
 
 <# 删包目录专用：PS 5.1 的 Remove-Item -Recurse 会跟进 junction 删到目标里，
@@ -396,14 +404,18 @@ if (Test-Path -LiteralPath $legacyLink) {
 # junction），那样垫片指向一个空目录，本地跑测试就会 import 不到 @deepseek-ai/*。
 # 这不是安装脚本能自己修的（官方包在应用自己的 asar / runtime 里），所以只做检查与提示。
 $sharedScope = Join-Path (Join-Path (Join-Path $DshHome 'profiles') 'node_modules') '@deepseek-ai'
-if (-not (Test-Path -LiteralPath $sharedScope)) {
-  Write-Warning "找不到 $sharedScope，垫片可能指向一个不存在的目录"
+$hasSharedScope = Test-Path -LiteralPath $sharedScope
+if (-not $hasSharedScope) {
+  Write-Warning "找不到 $sharedScope：跳过垫片。插件在 DSH 里照常工作，但本机跑 host/activate 套件会 import 不到 @deepseek-ai/*"
 } elseif (@(Get-ChildItem -LiteralPath $sharedScope -Force -ErrorAction SilentlyContinue).Count -eq 0) {
   Write-Warning "$sharedScope 是空目录（DSH 升级后常见）：插件在应用里照常工作，但本机跑 host/activate 套件会 import 不到 @deepseek-ai/*"
 }
 
-# 1. 垫片（目标位置会随 DSH 升级变化，所以允许重指）
-New-JunctionSafe -Path (Join-Path $pkgRoot 'node_modules\@deepseek-ai') -Target $sharedScope -Repoint | Out-Null
+# 1. 垫片（目标位置会随 DSH 升级变化，所以允许重指）。
+#    共享 scope 不存在时不建：Windows 不允许 junction 指向不存在的目标。
+if ($hasSharedScope) {
+  New-JunctionSafe -Path (Join-Path $pkgRoot 'node_modules\@deepseek-ai') -Target $sharedScope -Repoint | Out-Null
+}
 
 # 2. package.json
 $raw = Get-Content -LiteralPath $profileJson -Raw

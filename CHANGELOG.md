@@ -11,6 +11,29 @@
 - 配置 `globalDistillMinNew`（默认 3）与 `globalDistillCooldownMinutes`（默认 15）：设置页「二级蒸馏」分组可调。
 - 配置 `briefingRebuildMinNew`（默认 3）与 `briefingRebuildCooldownMs`（默认 10 分钟）：简报重算闸。此前会话内每写一条记忆都会重算系统提示，宿主按 `systemPromptUpdate: 'in-history'` 把整份 ~10KB 提示再追加一份进历史（实测 4 轮会话出现 6 份、29 轮会话 28 份）；现在攒够 3 条新记录、或距上次重算满 10 分钟才重算，单条写入继续用冻结字节，`/state` 的 `briefing.reason = "coalesced"` 与 `pendingNew` 可见等待中的条数。红线的新增 / 改稿 / 归档绕过闸立刻重算（安全边界）。两个键在 profile 配置里可覆盖，`1` / `0` 恢复「写一条就重算」的旧行为。
 
+### Fixed
+
+- 草稿审批不再静默丢内容：带 `supersedes` 的草稿若指向红线（或目标已消失），`POST /queue/approve` 返回 403/400 并保留草稿；此前会先删掉草稿再返回 200，审批失败等于内容彻底消失。
+- `POST /save` 与 `memory` 工具的 save 带 `id` 更新时不再误改字段：缺省 `scope` 沿用记录原来的库（全局记忆不会被写成 workspace）；工具只写显式给出的字段（`tags` / `category` / `files` / `evidence` 不再被空值清掉，`source` 也不再被改写）。
+- `GET /queue` 先筛草稿再分页：工作区有 100 条以上 active 记录时，靠后的待审稿也会出现在队列里（此前被 `limit 100` 挤出窗口，面板显示 0 条）。
+- `GET /portrait/export` 先按 `category=constraint` 过滤再取条数：混合记录超过 500 条时不会再漏出红线。
+- `POST /portrait/migrate`：重写通道返回 `no_material`（空库迁移的常见情况）时改走逐段合并，不再 500 丢内容；重写管线本身也把迁移文本当原料。
+- 设置写入识别字符串布尔值：手写 `settings.json` 或自动化客户端传 `"false"` / `"off"` / `"0"` 时按 false 处理（此前 `Boolean("false") === true`）。
+- 更新记忆时旧出处（`evidence`）也会重新过一遍密钥脱敏，旧库 / 手工改过的文件里的敏感出处不会随更新原样回写。
+- 辅助模型调用（提炼 / 画像 / 裁决）的推理档位查询失败后不再永久缓存空结果：一次瞬时失败不会让该 provider/model 一直按默认（可能是 max）档跑。
+- `uninstall.ps1` 用 reparse point 本身判定 junction：目标已被删的悬空 junction 也会被清掉（此前 `Test-Path` 跟随目标返回 false，卸载后残留）；`install.ps1` 的下载调用补 `-UseBasicParsing`，兼容 Windows PowerShell 5.1。
+- `node tools/check-compat.mjs` 在工作区是 junction / symlink 时会静默退出、什么都不检查（入口判定拿链接路径比真实路径）；改为两侧 `realpath` 比较后正常执行。
+- `tools/push.mjs` 在「新分支的提交已存在于远端」时会误报 `synced yes` 而不建分支引用；现在会补建 `refs/heads/<branch>` 并读回校验。`tools/status.mjs` 读不到仓库信息时给出明确报错，并跳过 draft release。
+- 设置页：点记忆页的即时开关（只 patch 单个键）不再清掉设置页里其它未保存的改动；开关请求失败时把乐观翻转回退，界面不再显示服务端并不存在的值。
+- 导入路径补齐写入安全：`POST /import` / 文件导入对标题、正文、理由、失效条件与出处逐项脱敏并重扫 taint，`evidence.url` 也纳入脱敏；画像保存、日志追加与 full 导入的日志同样先脱敏（D3/D4）。
+- `AGENTS.md` 托管块在文件以 `…结束 -->` 结尾（无换行）时不再把整篇当成块内正文；`index.json` 损坏时从各工作区 `memories.json` 重建，面板不再丢其它工作区。
+- 密钥扫描补齐 GitHub fine-grained PAT / GitLab PAT / AWS 临时密钥；私钥改为线性扫描（4MB 输入不再回溯到近 9 秒）；注入检测正则统一去掉 `g/y` 标志，消除 `lastIndex` 残留导致的间歇性漏检。
+- 既有记忆解析：剥掉 BOM；代码围栏里的 `#` / `##` 不再当标题；`**粗体**` 子标题也不在围栏内切分。
+- 语义裁决的簇 key 改用完整簇计算，超过 4 条的簇不再静默丢弃裁决；画像重写解析不再被前面出现的无关 JSON 截胡。
+- 面板所有「复制」按钮在非安全上下文（局域网 http / 反代无 TLS）下退化到 textarea + `execCommand`，失败时提示手动复制而不是点了没反应。
+- 设置落盘前按 Config schema 逐键复核：面板 POST 的越界值（如 `briefingLimit=9999`）会被丢弃并沿用旧值；`POST /settings` 先校验工作区再写设置，不会出现「返回失败但已经生效」。
+- 全量测试 719 → **724 条断言**（文档数字已同步）。
+
 ### Changed
 
 - 前台会话记忆卡改成**会话开始之后**才出现：开局（DSH 新建的空白会话、还没有任何用户消息）不再弹出空态卡片。

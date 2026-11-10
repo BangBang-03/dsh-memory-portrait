@@ -11,7 +11,7 @@
 
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-704%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
+[![Tests](https://img.shields.io/badge/tests-724%20passed-4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait#测试)
 
 DSH 的**工作区长期记忆**插件。对标 Qoder / WorkBuddy / ZCode 的记忆交互：记忆以当前工作区为单位落库，
 会话开始时把最重要的几条以**索引**形式注入系统提示（一行一条，正文按需用 `memory` 工具取，省 token），
@@ -334,7 +334,7 @@ pwsh -File uninstall.ps1 -PurgeStorage   # 连 ~/.dsh/storages/dsh-memory 一起
 ```powershell
 git checkout lab                       # 默认分支；平时只在这里动
 # …改代码…
-node test/run-all.mjs                  # 本机跑一遍：15 个套件 704 条断言
+node test/run-all.mjs                  # 本机跑一遍：15 个套件 724 条断言
 git add <改动的文件>; git commit -m "feat: …"   # 不要用 git add -A（.probe/ 是本地材料）
 
 $out = node tools/push.mjs --branch lab; $out   # 输出 base = 上一版在本地的对应提交
@@ -727,9 +727,9 @@ cd <克隆下来的 dsh-memory 目录>
 npm test          # 或 node test/run-all.mjs
 ```
 
-15 个套件、704 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
+15 个套件、724 项（各套件明细数字可能滞后，以 `npm test` 输出为准）：
 
-- `store` 178 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
+- `store` 184 项 —— 工作区分库、去重合并、检索打分（带 query 只返回真命中）、镜像（含真在工作区落盘 / 关开关撤回 /
   工作区不存在时不造目录）、导入导出、并发写；v0.3.0：版本链 supersede/rollback、user 类别强制全局与跨库迁移、
   草稿四不可见、重复簇聚类与合并、体检（重复/过期/断链/草稿）、索引简报预算、镜像版本链线索、keywords 加权、unlink；
   v0.5.0：日志层 journal（按天 `journal/YYYY-MM-DD.md`、只追加，是画像重写的上游原料）、画像的读写与草稿；
@@ -742,10 +742,10 @@ npm test          # 或 node test/run-all.mjs
   多跳 / 否定 / 标签各 10 条）。硬评测自测：Recall@5 1.000、MRR@10 0.930；词重叠基线 0.967 / 0.907；
   基线失败的 3 条硬样例上 1.000 vs 0.333。自测口径：静态集自建、本地离线打分、同一查询集上对比
   词重叠基线，无人工标注与外部基准。详见 `docs/retrieval-eval-2026-10-20.md`。
-- `security` 16 项 —— 写入安全：100 条密钥样本全部脱敏（原文零泄漏）、20 条注入样本全部命中、
+- `security` 19 项 —— 写入安全：100 条密钥样本全部脱敏（原文零泄漏）、20 条注入样本全部命中、
   20 条正常文本零误报、trust 分级（manual→user，模型不能自封）、非 user 来源的注入内容自动隔离成草稿、
   批准后不被反复打回。
-- `derivation` 14 项 —— 跨层派生链：画像层记下它引用了哪些记忆、源被归档 / 被改写 / 被删时标脏；
+- `derivation` 15 项 —— 跨层派生链：画像层记下它引用了哪些记忆、源被归档 / 被改写 / 被删时标脏；
   记忆晋升进 AGENTS.md 后源改写即标脏；画像段改写 → 从它派生的 AGENTS.md 跟着失效（链式传递）；
   重复晋升幂等；体检列出失效的派生条目。
 - `verification` 12 项 —— 可执行校验：显式 `falsifier` 与正文里「失效条件：…」的提取、显式空串清除、
@@ -763,13 +763,13 @@ npm test          # 或 node test/run-all.mjs
   按证据强度分层的晋升门槛（constraint / feedback / preference 单项目即可，decision / convention 要第二个项目）、
   主题词聚类与项目去重、模型输出解析容错（按类别分层的锚点底线、空数组 / 坏 JSON / 全被拒绝的诊断计数、
   对象包数组的容错），自适应节奏公式（空跑指数退避、素材闸 + 用户证据捷径），以及「候选池 → 晋升」端到端链路。
-- `api` 91 项 —— 54 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
+- `api` 96 项 —— 54 个端点、错误码、参数校验、按路径/文本导入与来源扫描；v0.3.0：
   /health 与 /health/resolve、/timeline、草稿队列（批准带编辑 / 拒绝 / 带 supersedes 的批准兑现版本链）、
   /save 带 supersedes 与 /supersede/rollback；v0.6：`GET /portrait/diff`（上一版 → 当前版的逐段 diff）；
   0.6.4：`GET /record` 依据下钻、`/redline/check` 冲突检查、`/redline/update` 改稿审计、
   `/redline/history` 与 `/redline/rollback`、Dream 时序矛盾归档与 `/health/resolve time-order`。
 - `host` 26 项 —— 导出形状、Config 默认值与越界校验（含二级蒸馏的素材门槛 / 基础间隔）、C7 文档覆盖闸。
-- `activate` 69 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
+- `activate` 72 项 —— 假装自己是 cordis，把 `apply()` 真跑一遍（走真实 store 并落盘）：
   工具 save/search/get/forget、全文简报装不下时明说「只列了 N / M 条」、`/memory/api/*` 路由真的应答
   且守好 403/404、手动提炼端到端、面板保存落到工作区镜像、既有记忆扫描导入、数据目录不可用不炸外壳；
   v0.3.0：索引简报（带 id 不展开正文 + full 模式对照）、轮末召回（召回块出现、连续两轮不重复）、
@@ -784,7 +784,7 @@ npm test          # 或 node test/run-all.mjs
   会话索引不把尾部召回块写成本轮用户发言（避免自我召回与重复提炼）。
 - `briefing-stability` 18 项 —— 会话级冻结快照、确定性排序、轮末召回的尾部注入与去重、重算硬冷却（冷却期内攒够条数也不追加系统提示）；
   改检索算法时用它守住「系统提示字节稳定」。
-- `client` 79 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
+- `client` 80 项 —— 客户端半的模块格式、槽位注册、导航项标记与卸载，以及**真的把设置页渲染出来**
   接到真实 `store` + `api` 上驱动交互（列表 / 搜索 / 新建 / 删除 / 置顶 / 中英文切换 / 后端报错）；
   档案视图的分区与两种排布、整篇编辑、整理、开关即时落库、时间线与维护 tab、五个页签
   （项目 / 全局 / 红线各自独立，红线不再混在全局页）、项目页切换工作区后只显示该工作区的条目并预览其 MEMORY.md；
@@ -792,7 +792,7 @@ npm test          # 或 node test/run-all.mjs
   历史回滚）、画像逐段编辑与依据下钻、收件箱就地批准草稿、原料抽屉默认收起、
   Dream 时序矛盾报告与待确认项手动归档；重写失败时把 `detail` 字符串与错误码一起显示（不是只剩一个裸错误码）；
   维护页的二级蒸馏卡显示上次素材 / 解析 / 拒绝原因 / 自适应节奏与脱敏原文。
-- `install` 16 项 —— 在临时目录里搭假 DSH 主目录，真跑 `install.ps1` / `uninstall.ps1`：
+- `install` 17 项 —— 在临时目录里搭假 DSH 主目录，真跑 `install.ps1` / `uninstall.ps1`：
   备份内容与原始一致、幂等、`-DryRun` 不落盘、卸载还原、`-PurgeStorage` 才删数据、
   0.3.2 之前的老别名安装会被自动迁移（清 bundles / dependencies 条目 + 摘旧 junction）、
   `-FromNpm` / `-FromUrl` 对着假 registry 真跑 HTTP 全流程（含 token 头与重跑即更新），
