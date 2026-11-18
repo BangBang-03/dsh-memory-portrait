@@ -7,7 +7,7 @@
 > `@bangbang-03/dsh-memory`，安装命令不变。文中旧仓库链接会由 GitHub 自动重定向。
 >
 > 2026-10-28 起仓库已改为单一 `main` + `v*` 标签发布；文中「lab / main 双线」与 `lab-latest`
-> 相关章节是历史，当前流程见 [`skills/release/SKILL.md`](../skills/release/SKILL.md)。
+> 相关章节是历史，当前流程见 [`tools/README.md`](../tools/README.md)。
 
 [![Release](https://img.shields.io/github/v/release/BangBang-03/dsh-memory-portrait?color=4d6bfe&label=release)](https://github.com/BangBang-03/dsh-memory-portrait/releases/latest)
 [![License](https://img.shields.io/github/license/BangBang-03/dsh-memory-portrait?color=4d6bfe)](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/LICENSE)
@@ -347,7 +347,7 @@ git checkout lab
 node tools/status.mjs                  # 两条线的头、lab/stable 通道、最近几次 CI
 pwsh -File install.ps1 -FromRelease    # 装刚发出去的实验版
 
-# 攒够一个版本、验证稳定之后：按 skills/release/SKILL.md 走正式发版
+# 攒够一个版本、验证稳定之后：按 tools/README.md 走正式发版
 ```
 
 本机 `github.com:443` **时通时不通**（2026-10-19 实测：短时可用，几分钟后又连续超时；每次失败要等约 21 秒）。
@@ -358,7 +358,7 @@ pwsh -File install.ps1 -FromRelease    # 装刚发出去的实验版
 
 `tools/sync.mjs` 是反方向的 `git pull`：按 GitHub API 把远端所有分支与标签逐个对象重建到本地
 （git 通道不通或换机器时用）。只在本地仓库损坏时用——它用远端内容覆盖工作区已跟踪的文件。
-本仓库当前发版流程见 `skills/release/SKILL.md`；上面「main 只做快进」是 lab/main 双线时代的历史。
+本仓库当前发版流程见 `tools/README.md`；上面「main 只做快进」是 lab/main 双线时代的历史。
 
 ## npm 包与远程更新
 
@@ -396,7 +396,7 @@ pwsh -File install.ps1 -FromNpm "@bangbang-03/dsh-memory@lab" `
 
 发布全在 CI 里做（本机 PAT 没有 `write:packages`），本地只负责推提交和打标签。
 两条线怎么分工见上面的「分支与发布通道」，完整步骤与验收见
-[`skills/release/SKILL.md`](skills/release/SKILL.md)。
+[`tools/README.md`](../tools/README.md)。
 
 ```powershell
 # 实验版：推 lab 就有，不用手动发；main 默认只追到上一版

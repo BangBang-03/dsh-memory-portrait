@@ -20,6 +20,7 @@
 和「自动多记一点」的插件不同，它把重点放在**记错了怎么办**：红线、审批队列、版本链、注入审计、派生链，全部能在 **设置 → 记忆** 里看到。
 
 - **画像是主视图**：每段挂证据，改了什么可 diff，源失效沿派生链标脏。
+- **界面统一**：设置页只有五个页签（项目记忆 / 全局记忆 / 红线 / 维护 / 设置），页签是带数量徽标的分段控件；工作区、画像、条目、工具与设置都收进同一套浅灰圆角卡片，层级固定为「标题 + 说明 + 操作」，浅色 / 深色跟随宿主主题。项目 / 全局记忆的标题行显示「更新于 MM-DD HH:mm · 相对时间」，刚更新时高亮；说明行带体量条（软上限提醒，不自动删除）。
 - **省 token**：索引模式同样预算多装约 3 倍条目；简报字节稳定，不破坏 prompt 前缀缓存。
 - **可控**：自动提炼可先进审批队列；红线逐字置顶，模型不能删改；改稿留历史，可回滚。
 - **可审计**：每次注入都记录正文 hash、命中的记忆 id、被预算挤掉的条目；画像与 `AGENTS.md` 有派生链。
@@ -125,6 +126,7 @@ Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0
 | 注入审计 | 每次进 prompt 的正文 hash + 记忆 id + 被挤掉的条目；append-only |
 | 派生链 | 记忆 → 画像 → `AGENTS.md` 每层记源快照；源失效沿链标脏 |
 | 整库快照 | 每天首次写入 + 每次 Dream 前备份，轮转 7 份；恢复 = 手工拷回库目录 |
+| Dream 变更清单 | 手动整理报告条目数前后变化、合并来源标题、复审续期与晋升全局的标题；额外给出最多 12 条低价值归档建议（曝光未用 / 过期未用 / 低质量，只建议，确认后才归档，可恢复） |
 | 写入安全 | 密钥脱敏 + 注入模式 taint；非 user 来源 taint 隔离成草稿 |
 
 ## 为什么是「画像」
@@ -296,7 +298,7 @@ npm test   # 15 个套件 / 724 项断言
 
 ## 维护与发布
 
-- 分支：`main` 是唯一长期分支；推 `main` 只跑测试，正式版用 `v*` 标签发布；完整流程与验收见 [`skills/release/SKILL.md`](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/skills/release/SKILL.md)。
+- 分支：`main` 是唯一长期分支；推 `main` 只跑测试，正式版用 `v*` 标签发布；完整流程与验收见 [`tools/README.md`](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/tools/README.md)。
 - 发版：`node tools/release.mjs`，然后 `node tools/release-watch.mjs`。
 - 完整规格、历史章节、导入格式、测试明细与边界讨论：[`docs/REFERENCE.md`](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/REFERENCE.md)。
 
@@ -312,13 +314,14 @@ npm test   # 15 个套件 / 724 项断言
 | 误报与规则冲突调研、改造方案 | [docs/false-positive-audit-2026-11-09.md](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/false-positive-audit-2026-11-09.md) |
 | 与 WorkBuddy 个人记忆的差距 | [docs/personal-memory-parity.md](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/personal-memory-parity.md) |
 | 市场扫描与竞品 | [docs/market-scan-2026-10.md](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/docs/market-scan-2026-10.md) |
-| 发版流程 | [skills/release/SKILL.md](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/skills/release/SKILL.md) |
+| 发版流程 | [tools/README.md](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/tools/README.md) |
 
 ## 参与
 
 - 安装 / 使用问题：用 [issue 模板](https://github.com/BangBang-03/dsh-memory-portrait/issues/new/choose)
 - 想法与用法：[Discussions](https://github.com/BangBang-03/dsh-memory-portrait/discussions)
 - 贡献代码：[CONTRIBUTING.md](https://github.com/BangBang-03/dsh-memory-portrait/blob/main/CONTRIBUTING.md)
+- 觉得有用：给项目点一个 [Star](https://github.com/BangBang-03/dsh-memory-portrait)，这对我们真的很重要。
 
 ## English
 

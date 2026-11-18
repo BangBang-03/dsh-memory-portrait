@@ -70,7 +70,7 @@ if (docProblems.length) {
   for (const problem of docProblems) console.log(`  - ${problem}`);
   console.log('');
   console.log('改了测试条数就同步 README / AGENTS / CONTRIBUTING / lib/README /');
-  console.log('skills/release / docs/REFERENCE / test/README 这 7 个文件；漏了会在这里红。');
+  console.log('docs/REFERENCE / test/README / test/run-all 这 7 个文件；漏了会在这里红。');
   process.exit(1);
 }
 

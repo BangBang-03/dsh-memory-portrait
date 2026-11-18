@@ -521,6 +521,12 @@ test('stats: 统计条数、置顶、类别分布、全局条数', () => {
   assert.ok(s.total > 0);
   assert.ok(s.global >= 1);
   assert.equal(Object.values(s.byCategory).reduce((x, y) => x + y, 0), s.total);
+  assert.match(s.updatedAt, /^\d{4}-\d{2}-\d{2}T/, '项目记忆应带最新更新时间');
+  assert.match(s.globalUpdatedAt, /^\d{4}-\d{2}-\d{2}T/, '全局记忆应带最新更新时间');
+  assert.equal(s.projectBytes > 0, true, '项目记忆应带体量');
+  assert.equal(s.globalBytes > 0, true, '全局记忆应带体量');
+  assert.equal(s.projectLimit, 256 * 1024, '项目软上限');
+  assert.equal(s.globalLimit, 64 * 1024, '全局软上限');
 });
 
 test('stats: 空工作区返回 0 而不是抛错', () => {

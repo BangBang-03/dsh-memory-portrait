@@ -23,7 +23,7 @@ node tools/check-compat.mjs [--npm]   # 兼容口径：README / package.json / n
 ```
 
 `main` 上的日常提交只跑 CI 测试；正式版由 `v*` 标签触发 `publish.yml` 的 stable job。
-完整发版顺序与失败处理见 [`skills/release/SKILL.md`](../skills/release/SKILL.md)。
+完整发版顺序与失败处理见 [`AGENTS.md`](../AGENTS.md) 的 P8 与「命令速查」。
 
 - token：优先 `GH_TOKEN` 环境变量，否则读本机 git credential store 里 `github.com` 的凭据。
 - **不要把 git 推送与 REST 推送混用**：REST 重建的提交时区归一成 `+0000`，同树不同 SHA，混推会分叉（`AGENTS.md` P3）。

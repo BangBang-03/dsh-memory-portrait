@@ -18,4 +18,4 @@
 带日期的文档是当时的调研快照，数字与结论不随代码更新；引用前先对照当前实现与测试。
 当前面板信息架构、红线审计 / 历史、画像逐段编辑与依据下钻、需要处理收件箱，以
 [`REFERENCE.md`](REFERENCE.md) 的「近期改动（0.6.4）」一节为准。正式发版流程见
-[`skills/release/SKILL.md`](../skills/release/SKILL.md)。
+[`tools/README.md`](../tools/README.md)。

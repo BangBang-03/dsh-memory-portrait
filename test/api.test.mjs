@@ -913,10 +913,19 @@ await test('POST /dream：合并重复簇、报告过期，画像未触发时不
   assert.equal(res.body.ok, true);
   assert.equal(res.body.merged.length, 1, '应合并出一簇');
   assert.equal(res.body.merged[0].count, 2);
+  assert.equal(res.body.merged[0].archivedTitles.length, 2, '合并清单应带来源标题');
   assert.equal(res.body.portrait, null, '未提供 rewriteNow 时不触发画像');
   assert.ok(res.body.staleReported >= 0);
   assert.equal(res.body.exposedUnusedReported, 1);
   assert.ok(res.body.exposedUnusedIds.includes(unused.id));
+  assert.equal(res.body.statsBefore.total, 3, '整理前条目数');
+  assert.equal(res.body.statsAfter.total, 2, '整理后条目数');
+  assert.ok(
+    res.body.lowValueSuggestions.some(
+      (item) => item.id === unused.id && item.reasons.includes('unused'),
+    ),
+    '曝光未用应进入低价值归档建议',
+  );
   const after = store.list({ workspace: ws, includeGlobal: false }).total;
   assert.equal(after, before - 1, '合并后有效条数减一（原条目归档）');
   assert.ok(

@@ -6,7 +6,6 @@ Memory Portrait（记忆画像）是 DSH 的工作区记忆插件（真包名 `@
 
 结构一句话：宿主半 `lib/index.js`（简报注入 / `memory` 工具 / `/memory/api` 路由 / 轮末召回）+
 客户端半 `lib/client.js`（设置面板「记忆」页）+ 其余 `lib/*.js` 纯 Node 逻辑层（不 import 任何 DSH 运行时，可脱离宿主单测）。
-项目级 skill 放在 `skills/`（只对本仓库生效，不装进全局 skill 目录），路由见 2.4。
 
 分支一句话：GitHub 默认分支是 **`main`**，也是唯一长期分支；正式版用 **`v*` 标签**发布。
 功能开发走短命分支或直接 `main`，合入前跑全量测试；`lab` 已删除，不再维护双线。
@@ -57,7 +56,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | **P5** | 卸载 / 替换只动 junction 与清单项；碰到同名**真实目录**直接报错退出，不许 `Remove-Item -Recurse` | PowerShell 5.1 会跟进 junction 删到共享的 `@deepseek-ai/*`（脚本里已专门防这一步） |
 | **P6** | 改完跑 `node test/run-all.mjs`（15 套件 / 724 断言）**全绿**才算改完；纯文档提交可跳过 | `store` / `api` / `briefing` 三套守的是数据完整性与注入稳定性 |
 | **P7** | 不加运行时依赖：`dependencies` 保持空，`peerDependencies` 全 optional，`lib/*.js` 只许 import `node:*` 与相对路径 | 插件要在用户机器上零安装；加依赖等于要求所有人重装 |
-| **P8** | 正式版只在 `main` 打 `v*` 标签，且 `package.json` 不许是预发布号（`-lab.N` / `-rc.N` 等）；打标签前 `main` 必须已推送并通过测试；不手改远端保护设置 | 标签挂在旧提交上，`/releases/latest` 发出去的就是旧代码；预发布号漏上去再也升不回来。完整步骤与验收见 `skills/release/SKILL.md` |
+| **P8** | 正式版只在 `main` 打 `v*` 标签，且 `package.json` 不许是预发布号（`-lab.N` / `-rc.N` 等）；打标签前 `main` 必须已推送并通过测试；不手改远端保护设置 | 标签挂在旧提交上，`/releases/latest` 发出去的就是旧代码；预发布号漏上去再也升不回来。打标签用 `node tools/release.mjs`，打完后跑 `node tools/release-watch.mjs` 核对 |
 
 ---
 
@@ -74,16 +73,16 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 简报注入、`memory` 工具、轮末召回、路径 JIT、路由挂载、Config schema | `lib/index.js` | `lib/portrait.js`、`lib/api.js` | `activate` + `briefing-stability` + `host` |
 | 模型输入的对话摘录（过滤召回块 / 当前轮判定 / 单条超长截断） | `lib/distill.js` 的 `isInjectedContext` / `selectTranscript` / `shouldDistill` | `lib/index.js` 的 `lastUserText` / `lastAssistantText` / `portraitTranscript` | `distill` + `activate` |
 | HTTP 端点、错误码、参数校验 | `lib/api.js` | README「HTTP 契约」表 | `api` |
-| 设置面板 UI（五个 tab：项目记忆 / 全局记忆 / 红线 / 维护 / 设置；项目页工作区选择器与 MEMORY.md 预览、条目区、红线工作台、工具抽屉、设置页概览与显示选项、维护页、图标标记） | `lib/client.js` | `test/mini-react.mjs`、`locale/*.json` | `client` |
+| 设置面板 UI（五个 tab：项目记忆 / 全局记忆 / 红线 / 维护 / 设置；页签是带数量徽标的分段控件；项目页工作区选择器与 MEMORY.md 预览、条目区、红线工作台、工具抽屉、设置页概览与显示选项、维护页、图标标记、页脚 star 提示、项目 / 全局「更新于」时间戳、体量条与软上限提醒、Dream 低价值归档建议） | `lib/client.js` | `test/mini-react.mjs`、`locale/*.json` | `client` |
+| 页签 / 卡片面色 / 按钮 / 页脚小字 / 主题配色 | `lib/client.js` 顶部 `.dshmem` 变量与 `.dshmem_tabs` 段 | 浅色 / 深色都要看一遍；面色只走 `--dshmem-surface` 与 `--dshmem-surface-strong` | `client` |
 | 前台会话记忆卡（Qoder 式摘要卡：头部六点拖动柄 + 图标底托 + 标题 + 收起，下接更新时间与一段话摘要；**开局不显示**——会话里还没有真实用户消息时整卡隐藏，`/session-brief` 的 `started` 翻成 true 后才出现；图标可选 `hudIcon`、大小 14–40px 走本机 `dsh-memory/session-hud/icon-size`（不是宿主配置）；尺寸 / 背景不透明度 / 背景色可选 `hudWidth` / `hudHeight` / `hudOpacity` / `hudColor`；头区可拖、位置持久化、按对话开关；设置页「会话卡外观」有滑杆 + 实时预览） | `lib/client.js` 的 `SessionMemoryHud` / `HUD_ICONS` / `hudReadIconSize` | `lib/api.js` 的 `/session-brief`（返回 `icon` + `hud` 外观 + `started`）、`lib/store.js` 的 `sessionSearch`、`lib/index.js` 的 `workspaceForSession` / `activeSession` / `sessionStarted` / `hud*` 配置 | `client` + `api` |
 | 清单兼容口径 / 市场元数据（`engines.dsh`、`dshReleases`、`marketplace`、`permissions`） | `package.json` | `README.md` 的「兼容性」、`tools/check-compat.mjs`、`.github/workflows/publish*.yml` | `host` + `node tools/check-compat.mjs` |
 | 提炼提示词、模型输出容错、触发条件 | `lib/distill.js` | `lib/index.js` 里的 capture 流程 | `distill` |
 | 全局原则晋升（候选准入 / 分层门槛 / 主题聚类 / 晋升执行） | `lib/distill-global.js` | `lib/index.js` 的 `runGlobalDistill` 与 `maybeDistillGlobally`、`docs/global-distill-trial-2026-11-05.md` | `distill-global` |
 | 二级蒸馏节奏与空产出诊断（`globalDistillMinNew` / `globalDistillCooldownMinutes` / `global-distill.json`） | `lib/distill-global.js` 的 `distillCadence` / `distillDue` / `analyzeGlobalDistill` | `lib/index.js` 的 `runGlobalDistill`、`lib/api.js` 的 `/health`、`lib/store.js` 的 `globalDistillState`、`lib/client.js` 维护页卡 | `distill-global` + `activate` + `api` + `client` |
-| 全局候选原则池（候选读写与裁决标记） | `lib/store.js` 的 `candidates` | `lib/distill-global.js`、`skills/global-distill/SKILL.md` | `store` + `distill-global` |
-| 交付前自查（发版前的必经步骤） | `skills/delivery-check/SKILL.md` | `skills/release/SKILL.md` 的 0.5 步、`test/run-all.mjs` 与 `tools/doc-numbers.mjs` 的闸门 | `host`（并跑一次 `run-all`） |
+| 全局候选原则池（候选读写与裁决标记） | `lib/store.js` 的 `candidates` | `lib/distill-global.js` | `store` + `distill-global` |
 | 文档里的断言总数与套件数校验 | `tools/doc-numbers.mjs` | `test/run-all.mjs` 的收尾段、`test/host.test.mjs` 的两条校验器测试 | `host`（并跑一次 `run-all` 看闸门） |
-| Dream 整理管线（合并重复簇 / 复审到期自动续期 / 矛盾线索仅诊断 / 全局原则晋升判定 / 启动 + 轮末到期检查与台账） | `lib/dream.js` | `lib/index.js` 的 `runAutoDream`、`lib/store.js` 的 `maintenanceState` / `noteMaintenance` / `candidates` / `reviewQueue`、`lib/api.js` 的 `/dream` 与 `/health` | `api` + `activate` + `store` + `distill-global` |
+| Dream 整理管线（合并重复簇 / 复审到期自动续期 / 矛盾线索仅诊断 / 全局原则晋升判定 / 整理前后统计与变更标题 / 最多 12 条低价值归档建议：曝光未用、过期未用、低质量；只建议，确认后才归档 / 启动 + 轮末到期检查与台账） | `lib/dream.js` | `lib/index.js` 的 `runAutoDream`、`lib/store.js` 的 `maintenanceState` / `noteMaintenance` / `candidates` / `reviewQueue` / `stats`、`lib/api.js` 的 `/dream` 与 `/health`、`test/api.test.mjs` 的 Dream 报告断言 | `api` + `activate` + `store` + `distill-global` |
 | 自动刷新全局画像（WorkBuddy 式主路径：turn/end + 会话销毁触发、吸收当前工作区近况） | `lib/index.js` 的 `scheduleAutoPortrait` / `runPortraitRewrite` | `lib/portrait.js`、`lib/client.js` 画像卡自动状态、`lib/api.js` 的 `/portrait` 与 `/health` | `activate` + `portrait` + `api` |
 | 画像段落、渲染 / 解析、预算截断、版本 diff | `lib/portrait.js` | `lib/store.js` 的 portrait 段 | `portrait` |
 | 自动判定策略注册表（15 条规则 + 三条治理校验：不可逆却不要人 / 词法却默认归档 / 人工项与 attention 不对应） | `lib/policy.js` | `test/host.test.mjs` 的四条策略校验、`test/fixtures/false-positive-2026-11-09.json`、`docs/false-positive-audit-2026-11-09.md` | `host` + `store`（并跑一次 `run-all`） |
@@ -97,10 +96,9 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 质量分与低分闸门 | `lib/quality.js` | `lib/store.js` 的 `qualityFields` | `store` |
 | 既有记忆解析（WorkBuddy / Qoder / Claude Code / Codex / Windsurf） | `lib/markdown.js` | 扫描落点 `memorySourceSpecs()` | `markdown` |
 | 安装 / 卸载 / 远程安装 | `install.ps1`、`uninstall.ps1` | `cordis.patch.yml` | `install` |
-| 推送、发版、远端同步 | `skills/release/SKILL.md` | `tools/push.mjs`、`tools/release.mjs`、`tools/release-watch.mjs`、`tools/sync.mjs`、`tools/status.mjs`、`tools/check-compat.mjs` | 见 P6；正式版按 skill 的验收清单 |
-| 文档同步 / 更新日志 | `skills/docs-sync/SKILL.md` | `README.md`、`AGENTS.md`、`CHANGELOG.md`、`docs/README.md` | 按 skill 的检查清单 |
-| 更新项目记忆文件 / 离线交接 | `skills/memory-doc/SKILL.md` | `lib/store.js` 的 `renderMarkdown`（镜像结构由它决定）、同目录 `memory-snapshot.json` | `store` |
-| 从项目提炼全局原则 / 二级蒸馏 | `skills/global-distill/SKILL.md` | `lib/distill-global.js`（判定规则）、`docs/global-distill-trial-2026-11-05.md` | `distill-global` |
+| 推送、发版、远端同步 | `tools/push.mjs`（推送）、`tools/release.mjs`（发版）、`tools/sync.mjs`（远端同步） | `tools/status.mjs`、`tools/release-watch.mjs`、`tools/check-compat.mjs`、`tools/README.md` | 见 P6；发版后跑 `release-watch.mjs` 核对 |
+| 文档同步 / 更新日志 | `README.md`、`CHANGELOG.md` | `AGENTS.md`、`docs/README.md`、`tools/doc-numbers.mjs` | `host`（并跑一次 `run-all`） |
+| 更新项目记忆文件 / 离线交接 | `lib/store.js` 的 `renderMarkdown`（镜像结构由它决定） | `.dsh-memory/MEMORY.md`、`.dsh-memory/memory-snapshot.json` | `store` |
 
 ### 2.2 症状 → 先去哪
 
@@ -125,9 +123,10 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 红线冲突提示误报 / 漏报 | `redlineConflicts()` 复用 `detectContradictions()` 的疑似矛盾词法规则，是启发式；调阈值/否定词时同步 `store` 与 `api` 的红线测试 |
 | 首页「需要处理」数字与收件箱不一致 | `healthData` / `queueData` / `reviewData` 的拉取条件；收件箱只在 `attentionOpen` 时拉 queue / reviews |
 | 改完代码界面没变 | 宿主半（`lib/index.js` 等）改动要**重启 DSH**；纯客户端改动 `Ctrl+Shift+R` 硬刷新即可 |
+| 浅色主题下卡片边界全丢 / 页面一片白 | 卡片面色是否被改回 `--dsw-alias-bg-layer-1/2`（浅色主题里它们都是白色）；统一用 `--dshmem-surface` / `--dshmem-surface-strong`，见「已知坑 5」 |
 | 前台会话记忆卡不出现 / 位置没记住 | 该会话是否还没说过话（`/session-brief` 的 `started=false` 时按设计不显示，发出首条用户消息后 1s 内自动出现）；宿主是否提供 `shell.overlay`；当前是否在对话页（设置弹窗、插件 / 自动化任务主面板会隐藏卡片）；设置页「该对话记忆」是否被关掉（按会话 id 存在 localStorage）；`localStorage` 是否可用（位置与展开状态也存本地）；卡片只认当前可见的 `[data-conversation-session]`，不再用最近活动会话兜底 |
 | 升级 DSH 后插件整块不生效 / 市场卡片说「已安装，与当前 dsh 不兼容」 | `engines.dsh` 是否覆盖当前版本；跑 `node tools/check-compat.mjs` 看 README / package.json 是否同源。DSH 0.2.1 起不匹配会进 `skippedBundles`，记忆面板 / `memory` 工具 / `/memory/api` 全部不生效 |
-| 正式版没发出去 / Release 不是 Latest / 资产缺失 / npmjs 没更新 | 先跑 `node tools/release-watch.mjs` 看 CI 与 Release 结论；npmjs 步骤 skipped 时先看仓库是否配置了 `NPM_TOKEN`；完整流程见 `skills/release/SKILL.md` |
+| 正式版没发出去 / Release 不是 Latest / 资产缺失 / npmjs 没更新 | 先跑 `node tools/release-watch.mjs` 看 CI 与 Release 结论；npmjs 步骤 skipped 时先看仓库是否配置了 `NPM_TOKEN`；完整流程见 `tools/README.md` |
 | `main` 与最新 tag 不一致 | 正常：tag 之后可能还有未发版提交；发版前先 bump 版本并重新打 tag，不要移动旧 tag |
 
 ### 2.3 文档路由
@@ -138,7 +137,7 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 完整规格、历史章节、导入格式、测试明细、边界 | `docs/REFERENCE.md` |
 | 版本变更日志 | `CHANGELOG.md` |
 | 发布素材与渠道草稿 | `docs/launch-copy-2026-10-28.md` |
-| 分支 / 发版 / 推送通道 | `skills/release/SKILL.md`、`tools/README.md` |
+| 分支 / 发版 / 推送通道 | `tools/README.md` |
 | 检索方案与基线数字 | `docs/retrieval-eval-2026-10-20.md` |
 | 简报为什么必须字节稳定 | `docs/briefing-cache-safety.md` |
 | 与 WorkBuddy 个人记忆的差距 | `docs/personal-memory-parity.md` |
@@ -147,19 +146,6 @@ npm 包名仍是 `@bangbang-03/dsh-memory`，安装命令不变。
 | 市场同类扫描、插件自查与竞品 | `docs/market-scan-2026-10.md`、`docs/dsh-memory-landscape-2026-10.md` |
 | 头部这一个月的新机制、可抄清单与优先级 | `docs/competitive-delta-2026-10-20.md` |
 | 市场实时榜与**分发堵点复盘**（2026-10-27 快照；npmjs 0.6.9 已发） | `docs/market-top10-2026-10-27.md` |
-
-### 2.4 项目级 skills
-
-本仓库自己的 skill 放在 `skills/`，只对本仓库生效，不装进全局 skill 目录。新增或修改 skill 后，在 2.1 加一行路由。
-
-| 想做什么 | 读 |
-| --- | --- |
-| 正式发版、打 `v*` 标签、核对 Release | `skills/release/SKILL.md` |
-| 更新文件 / 更新文档 / 更新日志 | `skills/docs-sync/SKILL.md` |
-| 更新项目记忆 `.dsh-memory/MEMORY.md`：结构、写作规范、离线交接 | `skills/memory-doc/SKILL.md` |
-| 交付前自查：发版前必做，测试绿了也要查交付物与文档 | `skills/delivery-check/SKILL.md` |
-| 从项目记忆提炼跨项目原则（二级蒸馏） | `skills/global-distill/SKILL.md` |
-| 新增项目级 skill 的目录与 frontmatter 约定 | `skills/README.md` |
 
 ---
 
@@ -193,6 +179,12 @@ node tools/release-watch.mjs           # 等 CI + 核对 Release
    （6 次、8–40ms 递增），彻底失败会先擦掉 `.tmp` 再抛。所以再红就是真问题——**别再习惯性「重跑一下」**。
 4. **导航图标是 CSS 掩码贴上去的**：DSH 的 `settings.section` 不投影 icon，`syncNavMarker()` 靠「文本等于本插件本地化标题」认行。
    外壳改结构最坏结果是退回齿轮，不影响导航本身——不要为它去改 `configForms`。
+5. **卡片面色不要用 `--dsw-alias-bg-layer-1/2/3` 当灰底**：这三个 token 在浅色主题里**都是纯白**（`neutral-bluish-00`），
+   拿来铺卡片等于白底白卡、边界全丢。统一走 `.dshmem` 里定义的 `--dshmem-surface`（宿主 `bg-module-platform`）与
+   `--dshmem-surface-strong`（`label-primary` 半透明叠加）；只有「浮起选中块」才用 `bg-layer-3`（浅色白、深色 `#353638`）。
+   页脚的 star 提示是刻意保留的唯一常驻推广位：11.5px、居中、不占操作区，不要升级成按钮或弹窗。
+6. **记忆体量软上限只是提示，不是闸**：`store.stats` 的 `projectLimit` / `globalLimit`（256KB / 64KB）只驱动面板体量条与超线提醒，
+   不参与简报裁剪、检索或自动删除；Dream 的低价值条目也只给建议，必须用户在面板确认后才归档（D7）。
 
 ---
 

@@ -547,6 +547,11 @@ await test('首屏渲染出项目记忆与统计，全局记忆在自己的页�
     '档案视图不该出现搜索框',
   );
   assert.match(body, /直接在对话里说/, '档案视图缺少「在对话里加记忆」的提示');
+  assert.match(body, /更新于 \d{2}-\d{2} \d{2}:\d{2}/, '项目记忆缺少「更新于」时间');
+  assert.ok(
+    mini.findAll(view, (node) => String(node.props?.className || '').split(/\s+/).includes('dshmem_cap')).length > 0,
+    '项目记忆缺少体量条',
+  );
   // 切到列表视图才能看到条数统计。
   await switchView('viewList');
   const list = text();
@@ -557,6 +562,7 @@ await test('首屏渲染出项目记忆与统计，全局记忆在自己的页�
   await clickTab('tabGlobal');
   await settle(10);
   assert.match(text(), /全局偏好/);
+  assert.match(text(), /更新于 \d{2}-\d{2} \d{2}:\d{2}/, '全局记忆缺少「更新于」时间');
   assert.doesNotMatch(text(), /插件安装方式/, '项目记忆不该出现在全局页');
 });
 
@@ -1799,6 +1805,8 @@ await test('维护页：Dream 按钮调用 /dream 并显示报告', async () => 
   const body = text();
   assert.match(body, /合并 1 簇/, '应显示合并簇数');
   assert.match(body, /曝光未用 [1-9]\d* 条/, '应显示曝光未用数');
+  assert.match(body, /建议归档的低价值条目/, 'Dream 报告应列出低价值归档建议');
+  assert.match(body, /Dream 曝光未用/, '建议列表应包含曝光未用条目');
   assert.match(body, /Dream 完成/, '应有完成提示');
 });
 

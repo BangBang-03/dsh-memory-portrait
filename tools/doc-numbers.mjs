@@ -16,7 +16,6 @@ export const DOC_FILES = [
   'AGENTS.md',
   'CONTRIBUTING.md',
   'lib/README.md',
-  'skills/release/SKILL.md',
   'docs/REFERENCE.md',
   'test/README.md',
   /* 测试入口里的套件描述也是人读的，漏改一样会误导人。 */
