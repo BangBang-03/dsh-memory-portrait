@@ -7,7 +7,7 @@
 
 ## 一、结论
 
-**本轮自查已完成，代码、兼容元数据、全量测试和真机加载均已通过；未发现会导致启动失败、崩溃或数据损坏的 P0 问题。** 共确认并修复 5 个 P1 级真实问题、10 个 P2 级体验/健壮性问题（含第三轮新增的 1 个 P1、第四轮新增的 2 个 P2：深色选中态与版本链取消归档）；前台会话记忆卡与后台「记忆」设置页已统一字体、层级、间距、圆角和卡片材质。
+**本轮自查已完成，代码、兼容元数据、全量测试和真机加载均已通过；未发现会导致启动失败、崩溃或数据损坏的 P0 问题。** 共确认并修复 5 个 P1 级真实问题、10 个 P2 级体验/健壮性问题（含第三轮新增的 1 个 P1、第四轮新增的 2 个 P2：深色选中态与版本链取消归档），另补齐 O2/O3 两个 P3；前台会话记忆卡与后台「记忆」设置页已统一字体、层级、间距、圆角和卡片材质。
 
 当前状态：
 
@@ -15,14 +15,14 @@
 |---|---|---|
 | 宿主 0.2.2 兼容性 | 通过 | app.asar 内 0.2.2 源码核对 + 真机加载 |
 | 主题令牌 | 通过（修正 2 处错名） | `state-warn-primary`、`bg-base` 等已替换 |
-| 真实 bug | 已修复 5 个 P1 + 10 个 P2 | `lib/client.js` 427 行、`lib/store.js` 87 行变更 |
+| 真实 bug | 已修复 5 个 P1 + 10 个 P2，另修 2 个 P3（O2 图标槽位 / O3 页签键盘） | `lib/client.js`、`lib/store.js` 变更 |
 | 前台/后台 UI | 已统一 | 同一字体栈、同一层级比例、同一材质与圆角体系；深色选中态已单独校准 |
-| 全量测试 | 通过 | 15 个套件 / 724 条断言；Node 22 与 Node 24 双跑 |
-| 真机验证 | 通过 | 0.2.2-rc.5 加载、设置页、HUD、越界坐标回收、浅色/深色切换与深色 HUD |
+| 全量测试 | 通过 | 15 个套件 / 724 项；Node 22 与 Node 24 双跑 |
+| 真机验证 | 通过 | 0.2.2-rc.5 加载、设置页、HUD、越界坐标回收、浅色/深色切换、深色 HUD、官方图标槽位 |
 | 交付 | 报告与截图已落盘 | 本文件 + `docs/audit-assets-2026-11-24/` |
-| Git | **未 commit、未 push** | 7 个已跟踪文件修改；报告、截图、`.idea`、`.probe` 未跟踪 |
+| Git | O2 已提交并 push；工作区干净 | 上一批 `04cbeb0`；当前 `main` 与 `origin/main` 同步；仅 `.idea/`、`.probe/` 未跟踪 |
 
-> 版本号仍为 `0.10.0`，本轮不发布、不改 `dsh` 版本范围；等主人验收后再决定是否 commit。
+> O2 图标槽位改动已提交并推送；版本号仍为 `0.10.0`，本轮不发布、不改 `dsh` 版本范围。
 
 ## 二、环境与审计口径
 
@@ -272,12 +272,12 @@
 
 ## 六、新发现与遗留 issue（含第三、四轮）
 
-本轮除修复上表 P1/P2，还确认了以下 issue。O3 已在第三轮顺手补齐；其余未纳入主流程，但建议排期：
+本轮除修复上表 P1/P2，还确认了以下 issue。O2 已补官方图标槽位、O3 已在第三轮补齐；其余未纳入主流程，但建议排期：
 
 | ID | 等级 | Issue | 现状/风险 | 建议 |
 |---|---|---|---|---|
 | O1 | P2 | `lib/policy.js` 的归档恢复缺 `supersededBy` 回滚链 | 已修（B15）：`update` / `bulk unarchive` 都按版本链方向恢复；同一链两端同时选中返回 `chain_conflict` | 不再单开 issue，回归测试已覆盖 |
-| O2 | P3 | 0.2.2 已有官方 `settings.section.icon` 槽位，插件仍用 CSS 替换齿轮图标 | 当前 `span.navIcon > svg:first-child` 在 0.2.2 可命中；宿主未来改 nav DOM 可能失效 | 后续切官方槽位，避免与 `::before` 字形叠加 |
+| O2 | P3 | 0.2.2 已有官方 `settings.section.icon` 槽位，插件仍用 CSS 替换齿轮图标 | 当前 `span.navIcon > svg:first-child` 在 0.2.2 可命中；宿主未来改 nav DOM 可能失效 | 已修：注册官方 `settings.section.icon`（`id=memory`），旧宿主保留 `syncNavMarker` + CSS 字形兜底；0.2.2 真机确认 `data-slot="settings.section.icon"` 与 `data-dshmem-nav-icon`，`::before` 为 `none`，无图标叠加 |
 | O3 | P3 | 页签原有 `role=tab` / `aria-selected`，但缺方向键 / Home / End 与 `aria-controls` | 键盘用户要按 Tab 逐个跳过 5 个页签；读屏无法把 tab 与面板关联 | 第三轮已补 `onTabKeyDown`、`aria-orientation`、`aria-controls` 与唯一面板 id；真机方向键回归已通过 |
 | O4 | P3 | 项目页 215 条记录全部挂载，内容高约 24,461px | 当前规模滚动正常；记录数继续增长会变重 | 到 500+ 条再评估虚拟列表，当前不提前优化 |
 | O5 | P2（验证缺口） | 深色真机切换、深色 HUD 已完成；HUD 缩放与页签键盘已真机回归通过 | 仍缺 30 分钟浸泡与多窗口验证，不能把这两项写进已验证矩阵 | 发布前补一次 30 分钟浸泡 + 多窗口验证 |
@@ -289,6 +289,7 @@
 - **B13（P1，已修并真机验证）**：HUD 缩放读取未绑定的 `settings`，按下把手即抛 `ReferenceError`；改用 `look.width/height`。真机模拟 `pointerdown → pointermove → pointerup` 已通过：卡片从 `270×208` 变为 `340×256`，`data-size=fixed`，无 `window error`。
 - **B14（P2，第四轮已修）**：深色下页签/分段选中块与轨道几乎同色，选中态消失；用 `bg-layer-3` `#353638` 对 `#363638` 轨道只差 1–2 RGB。已改为深色使用宿主选中态 `#43454a`，浅色保持白底。
 - **B15（P2，第四轮已修）**：取消归档只翻 `archived` 位，旧版本与新版本会双活；新增 `reopenRecord()` 按链方向恢复，批量两端同时选返回 `chain_conflict`。
+- **O2（P3，已修并真机验证）**：注册官方 `settings.section.icon`（`id=memory`），图标带 `data-dshmem-nav-icon`；旧宿主没有该槽位时仍走 `syncNavMarker` + CSS 字形。0.2.2 真机导航项内是 `data-slot="settings.section.icon"` 的官方图标，`::before` 无额外字形，图标不再依赖宿主 nav DOM 的未来形状。另在真机 DOM 做临时双分支验证：带官方图标时 `::before` 为 `none`、`svg` 为 `inline`；移除图标后 `::before` 恢复 `""` 且 mask 命中，旧兜底仍有效。
 - **O3（P3，已补并真机验证）**：页签原本已经有 `role=tab` / `aria-selected`，上一版报告写成“缺少”是误判；本轮补的是方向键 / Home / End 循环切换、`aria-orientation`、`aria-controls` 和唯一面板 id。真机发送 `ArrowRight` 后，焦点与 `aria-selected` 从「项目记忆」同步切到「全局记忆」。
 - **O7（P3，未改）**：页签/分段控件重复 `background` 声明，宿主 token 被后一条 `color-mix` 覆盖；视觉差异小，先记录，不重拍截图。
 - **纠正**：上一版报告把 `role=tab` 缺失列为 O3，属于核对不完整；本轮以代码为准修正。
@@ -315,7 +316,7 @@ git diff --check
 - `node tools/check-compat.mjs`：`range=>=0.2.0-rc.2 <0.3.0-0，releases=6 条，README 表=6 行`
 - `git diff --check`：无空白错误
 - `package.json`：JSON 解析通过
-- CSS 模板：**40,338 字符，`{` / `}` 各 283，最终深度 0，最小深度 0**
+- CSS 模板：**40,403 字符，`{` / `}` 各 283，最终深度 0，最小深度 0**
 
 ### 7.2 真机
 
@@ -326,6 +327,7 @@ git diff --check
 - HUD 胶囊 `140×34`；
 - HUD 实时预览、卡片宽度/高度滑杆、路径拆分均可见；
 - 旧坐标 `left=1647` 经 `hudFitPos` 收回到约 `1090–1130`，胶囊可见；
+- 官方 `settings.section.icon` 真机命中：导航项内为 `data-slot="settings.section.icon"` + `data-dshmem-nav-icon`，无重复字形；
 - HUD 缩放真机模拟：`270×208 → 340×256`，`data-size=fixed`，坐标 `x1004 → x964`，`window.__dshErr` 为空；
 - 设置页键盘真机回归：发送 `ArrowRight` 后焦点与 `aria-selected` 从「项目记忆」切到「全局记忆」，5 个页签的 `aria-controls` 全部指向 `#dshmem-memory-tabpanel`；
 - 深色真机：html `data-ds-theme-source=dark`，页签选中块 `rgb(67,69,74)`（`#43454a`）对轨道约 `#363638`，分段控件同样；浅色切回后选中块仍为 `rgb(255,255,255)`；
@@ -338,7 +340,9 @@ git diff --check
 
 ## 八、改动文件与交付
 
-### 8.1 已修改（未 commit）
+### 8.1 改动文件
+
+**已随 `04cbeb0` 提交并 push**：18 个文件，**780 insertions / 145 deletions**；其中代码/测试/配置 7 个文件为 401 insertions / 145 deletions，另含本报告与 10 张审计截图。
 
 | 文件 | 变更 |
 |---|---|
@@ -350,9 +354,15 @@ git diff --check
 | `package.json` | `dsh.compatibility.dshReleases` 增加 `0.2.2-rc.5: compatible` |
 | `README.md` | 兼容表增加 `0.2.2-rc.5` 行，`0.2.2-alpha.2` 标 unknown |
 
-`git diff --stat`：7 个文件，**401 insertions / 145 deletions**；其中 `lib/client.js` 427 行、`lib/store.js` 87 行、`test/store.test.mjs` 23 行。
+**本轮 O2 增量（已提交并 push）**：3 个文件，**77 insertions / 20 deletions**。
 
-`git status --short`：`M README.md`、`M lib/api.js`、`M lib/client.js`、`M lib/policy.js`、`M lib/store.js`、`M package.json`、`M test/store.test.mjs`、`?? .idea/`、`?? .probe/`；本轮新增报告与截图目录也是未跟踪状态。
+| 文件 | 变更 |
+|---|---|
+| `lib/client.js` | 新增 `MemoryNavIcon` 并注册官方 `settings.section.icon`（`id=memory`）；图标带 `data-dshmem-nav-icon`；CSS 隐藏默认齿轮改为排除自有图标，`::before` 字形仅在无官方图标时出现；`inject` 失败时静默保留旧兜底 |
+| `test/client.test.mjs` | 补官方图标槽位 id/order/component 断言；更新 nav 字形选择器断言（覆盖官方图标与旧兜底两条路径） |
+| `docs/compat-ui-selfcheck-2026-11-24.md` | 更新 Git 状态、O2 修复记录与统计 |
+
+`git status --short`：`M docs/compat-ui-selfcheck-2026-11-24.md`、`M lib/client.js`、`M test/client.test.mjs`、`?? .idea/`、`?? .probe/`。
 
 ### 8.2 交付物
 
@@ -364,9 +374,9 @@ git diff --check
   - `real-memory-project.png` / `real-memory-overview.png`：真机 0.2.2-rc.5 浅色截图
   - `real-memory-dark.png` / `real-hud-dark.png`：真机深色设置页与深色 HUD
 
-### 8.3 未做
+### 8.3 边界
 
-- 未 `git commit`、未 `git push`；
+- 上一批已 `git commit` + `git push`（`04cbeb0`）；本轮 O2 也已 commit + push；
 - 未改版本号、未发版；
 - 未改 `lib/index.js`；
 - 未训练、未合成数据、未下载额外数据。
@@ -374,6 +384,6 @@ git diff --check
 ## 九、建议下一步
 
 1. **验收 UI**：先看真机截图与静态浅色/深色预览，确认「HUD 13px / 设置页 14px」的分层是否接受；如果要完全同字号，改一个 token 后重测 HUD 高度。
-2. **确认 commit**：本轮 7 个文件可拆成两个提交（UI/兼容性 + 版本链恢复）；报告与截图是否一起入库由主人决定。
-3. **发布前补验证**：30 分钟浸泡 + 多窗口；深色真机与深色 HUD 已完成。如通过，再把 `0.2.2-rc.5` 的 compatible 标注保留。
-4. **另开 issue**：`settings.section.icon` 官方槽位与页签重复 `background` 属 P3 技术债，不与本次修复混提。
+2. **验收 O2**：官方图标槽位已真机通过并提交；如需在旧宿主上做一次实机复核，再补 0.2.0 / 0.2.1 环境。
+3. **发布前补验证**：30 分钟浸泡 + 多窗口；深色真机、深色 HUD 与官方图标槽位已完成。如通过，再把 `0.2.2-rc.5` 的 compatible 标注保留。
+4. **另开 issue**：页签/分段控件的重复 `background` 属 P3 技术债，留给后续收敛。

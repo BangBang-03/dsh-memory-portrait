@@ -429,6 +429,11 @@ await test('apply 注册 locale 字典（含 en）并挂到 settings.section', (
   assert.equal(typeof slotRegistration.component, 'function');
   assert.equal(typeof slotRegistration.options.label, 'function');
   assert.equal(slotRegistration.options.label(), '记忆');
+  const iconSlot = slotRegistrations.get('settings.section.icon');
+  assert.ok(iconSlot, '缺少官方 settings.section.icon 槽位注册');
+  assert.equal(iconSlot.options.id, 'memory', 'icon 槽位 id 必须与 section 对齐');
+  assert.equal(iconSlot.options.order, 25);
+  assert.equal(typeof iconSlot.component, 'function');
 });
 
 await test('导航项被标记成自有字形，且卸载时撤掉标记', () => {
@@ -439,7 +444,8 @@ await test('导航项被标记成自有字形，且卸载时撤掉标记', () =>
   assert.equal(observers.length, 1, '应只挂一个 MutationObserver');
   assert.equal(observers[0].target, documentStub.body);
   assert.ok(observers[0].options.childList && observers[0].options.subtree);
-  assert.match(styleTags[0].textContent, /\[data-dshmem-nav\] svg:first-child\{display:none/);
+  assert.match(styleTags[0].textContent, /\[data-dshmem-nav\] svg:first-child:not\(\[data-dshmem-nav-icon\]\)\{display:none/);
+  assert.match(styleTags[0].textContent, /button\[data-dshmem-nav\]:not\(:has\(svg\[data-dshmem-nav-icon\]\)\)::before/);
   assert.match(styleTags[0].textContent, /--dshmem-nav-glyph:url\("data:image\/svg\+xml,/);
 
   // 卸载：标记撤掉、观察断开。apply 里的第二个 effect 就是它。
