@@ -83,8 +83,9 @@ pwsh -File install.ps1             # 真装
 | `0.2.0-rc.2` | compatible（已测试） |
 | `0.2.1-rc.3` | compatible（已测试） |
 | `0.2.1-rc.4` | unknown（范围覆盖，未单独测试） |
-| `0.2.1-rc.5` | compatible（当前桌面版，已测试） |
+| `0.2.1-rc.5` | compatible（已测试） |
 | `0.2.2-alpha.2` | unknown（范围覆盖，未测试） |
+| `0.2.2-rc.5` | compatible（当前桌面版，已真机验证） |
 
 Node `^22.19.0 || >=24.0.0`；DSH 范围 `>=0.2.0-rc.2 <0.3.0-0`。范围按 **0.2 版本线**整体声明，避免 DSH 每发一个 nightly 就在宿主启动时被跳过；逐版本测试结论仍记在 `dsh.compatibility.dshReleases`，未测试的版本标 `unknown`，不冒充 compatible。
 

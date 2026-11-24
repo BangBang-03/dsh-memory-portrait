@@ -507,6 +507,17 @@ test('bulk: 批量归档与删除', () => {
   assert.ok(store.list({ workspace: WS_B, includeGlobal: false }).records.some((r) => r.id === a.id));
   store.bulk('delete', [a.id, b.id], { workspace: WS_B });
   assert.equal(store.list({ workspace: WS_B, includeGlobal: false }).total, 1);
+
+  // 批量取消归档也要守版本链：两端一起选必须拒绝，单端恢复要收起新条。
+  const old = store.upsert({ title: 'bulk-chain-old', content: '旧结论' }, { workspace: WS_B });
+  const sup = store.supersede(old.record.id, { title: 'bulk-chain-new', content: '新结论', source: 'agent' }, { workspace: WS_B });
+  const conflict = store.bulk('unarchive', [old.record.id, sup.record.id], { workspace: WS_B });
+  assert.equal(conflict.ok, false, '同一链两端同时取消归档应被拒绝');
+  assert.equal(conflict.error, 'chain_conflict');
+  const single = store.bulk('unarchive', [old.record.id], { workspace: WS_B });
+  assert.ok(single.ok);
+  assert.equal(store.get(old.record.id, { workspace: WS_B }).archived, false);
+  assert.equal(store.get(sup.record.id, { workspace: WS_B }).archived, true, '恢复旧条时新条应收起');
 });
 
 test('bulk: 空数组安全', () => {
@@ -1383,6 +1394,18 @@ test('rollback：从新条回滚恢复旧条；再从旧条撤销亦然', () => 
   assert.ok(undo.ok, '从旧条端回滚应成功');
   assert.equal(s.get(old.record.id, { workspace: ws }).archived, false);
   assert.equal(s.get(sup2.record.id, { workspace: ws }).archived, true);
+
+  // 面板「取消归档」走 update 路径，不能只把 archived 翻 false：
+  // 先恢复新条应收起旧条，再从旧条端恢复应重新收起新条。
+  const openNew = s.update(sup2.record.id, { archived: false }, { workspace: ws });
+  assert.ok(openNew.ok, '取消归档新条应成功');
+  assert.equal(s.get(sup2.record.id, { workspace: ws }).archived, false);
+  assert.equal(s.get(old.record.id, { workspace: ws }).archived, true, '恢复新条时旧条应收起');
+  const openOld = s.update(old.record.id, { archived: false }, { workspace: ws });
+  assert.ok(openOld.ok, '取消归档旧条应成功');
+  assert.equal(s.get(old.record.id, { workspace: ws }).archived, false);
+  assert.equal(s.get(sup2.record.id, { workspace: ws }).archived, true, '恢复旧条时新条应收起');
+  assert.equal(s.get(old.record.id, { workspace: ws }).supersededBy, null);
 });
 
 test('user 类别强制全局：落库进全局库，改类别时跨库迁移', () => {
